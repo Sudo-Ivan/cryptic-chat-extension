@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const downloadBtn = document.getElementById("downloadBtn");
   const fileInput = document.getElementById("fileInput");
   const dropZone = document.getElementById("dropZone");
+  const updateFromUrlBtn = document.getElementById("updateFromUrlBtn");
   const errorMsg = document.createElement("p");
   errorMsg.id = "errorMsg";
   errorMsg.style.color = "red";
@@ -12,13 +13,14 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelector(".options-container").appendChild(errorMsg);
 
   chrome.storage.local.get("wordlist", (data) => {
-      displayWordlist(data.wordlist || {});
+    displayWordlist(data.wordlist || {});
   });
 
   saveBtn.addEventListener("click", saveWordlist);
   uploadBtn.addEventListener("click", () => fileInput.click());
   downloadBtn.addEventListener("click", downloadWordlist);
   fileInput.addEventListener("change", (event) => processFile(event.target.files[0]));
+  updateFromUrlBtn.addEventListener("click", updateFromUrl);
 
   dropZone.addEventListener("dragover", handleDragOver);
   dropZone.addEventListener("dragleave", handleDragLeave);
@@ -29,7 +31,7 @@ function displayWordlist(wordlist) {
   const wordlistTextArea = document.getElementById("wordlist");
   let formattedWordlist = "";
   for (const [key, value] of Object.entries(wordlist)) {
-      formattedWordlist += `${key} : ${value}\n`;
+    formattedWordlist += `${key} : ${value}\n`;
   }
   wordlistTextArea.value = formattedWordlist.trim();
 }
@@ -123,6 +125,11 @@ function showError(message, isError = true) {
   const errorMsg = document.getElementById("errorMsg");
   errorMsg.textContent = message;
   errorMsg.style.color = isError ? "red" : "green";
+  if (isError) {
+    console.error(message);
+  } else {
+    console.log(message);
+  }
   setTimeout(() => {
     errorMsg.textContent = "";
   }, 5000);
@@ -130,30 +137,42 @@ function showError(message, isError = true) {
 
 function updateFromUrl() {
   const urlInput = document.getElementById("urlInput");
-  const url = urlInput.value.trim();
+  let url = urlInput.value.trim();
+
+  console.log("Original URL:", url);
 
   if (!isValidUrl(url)) {
     showError("Please enter a valid HTTPS URL ending with .txt");
     return;
   }
 
+  if (url.startsWith('https://github.com/') && url.includes('/blob/')) {
+    url = url.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/');
+  }
+
+  console.log("Fetching from URL:", url);
+
   fetch(url)
     .then(response => {
+      console.log("Response status:", response.status);
       if (!response.ok) {
-        throw new Error('Network response was not ok');
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
       return response.text();
     })
     .then(text => {
+      console.log("Fetched text:", text.substring(0, 100) + "...");
       document.getElementById("wordlist").value = text;
       saveWordlist();
       showError("Wordlist updated successfully from URL!", false);
     })
     .catch(error => {
+      console.error("Fetch error:", error);
       showError("Error fetching wordlist: " + error.message);
     });
 }
 
 function isValidUrl(url) {
-  return url.startsWith('https://') && url.endsWith('.txt');
+  return (url.startsWith('https://') && url.endsWith('.txt')) || 
+         (url.startsWith('https://github.com/') && url.includes('/blob/') && url.endsWith('.txt'));
 }
