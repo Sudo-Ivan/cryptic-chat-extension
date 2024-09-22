@@ -165,3 +165,63 @@ button:active {
     width: 32px;
     height: 32px;
 }
+
+.drop-zone {
+    width: 90%;
+    height: 100px;
+    border: 2px dashed #4ecca3;
+    border-radius: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 20px;
+    transition: background-color 0.3s;
+}
+
+.drop-zone p {
+    color: #4ecca3;
+    font-size: 18px;
+}
+
+.drop-zone.dragover {
+    background-color: rgba(78, 204, 163, 0.1);
+}
+
+#errorMsg {
+    color: red;
+    font-size: 14px;
+    margin-top: 10px;
+    text-align: center;
+    min-height: 15px;
+}
+
+.url-input-container {
+    display: flex;
+    width: 90%;
+    margin-bottom: 20px;
+  }
+  
+  #urlInput {
+    flex-grow: 1;
+    padding: 10px;
+    font-size: 14px;
+    border: 1px solid #4ecca3;
+    border-radius: 5px 0 0 5px;
+    background-color: #16213e;
+    color: #ffffff;
+  }
+  
+  #updateFromUrlBtn {
+    padding: 10px 15px;
+    font-size: 14px;
+    background-color: #4ecca3;
+    color: #ffffff;
+    border: none;
+    border-radius: 0 5px 5px 0;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+  
+  #updateFromUrlBtn:hover {
+    background-color: #45b393;
+  }
