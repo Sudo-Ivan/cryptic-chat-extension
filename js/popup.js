@@ -6,7 +6,6 @@ function processText(action, inputElement, outputElement) {
 
   const inputText = inputElement.value;
 
-  // If input is empty, clear the output and exit
   if (!inputText.trim()) {
     outputElement.value = '';
     isProcessing = false;
@@ -54,6 +53,18 @@ document.addEventListener('DOMContentLoaded', function() {
       chrome.runtime.openOptionsPage();
     } else {
       window.open(chrome.runtime.getURL('options.html'));
+    }
+  });
+
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === "showResults") {
+      if (request.results.encryptedMessage) {
+        outputText.value = request.results.encryptedMessage;
+        inputText.value = request.message || "";
+      } else if (request.results.decryptedMessage) {
+        inputText.value = request.results.decryptedMessage;
+        outputText.value = request.message || "";
+      }
     }
   });
 });
