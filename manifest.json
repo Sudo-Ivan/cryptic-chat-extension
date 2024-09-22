@@ -1,7 +1,10 @@
 {
     "manifest_version": 3,
     "name": "Cryptic Chat",
-    "version": "1.0",
+    "version": "1.1",
+    "author": {
+      "name": "Sudo-Ivan"
+    },
     "description": "Encrypt and decrypt cryptic messages to get around censorship.",
     "permissions": [
       "activeTab",
