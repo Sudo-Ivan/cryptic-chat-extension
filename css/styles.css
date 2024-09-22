@@ -1,0 +1,167 @@
+/* Common styles */
+body {
+    font-family: 'Roboto', 'Arial', sans-serif;
+    background-color: #1a1a2e;
+    color: #ffffff;
+    margin: 0;
+    padding: 0;
+}
+
+h1 {
+    font-size: 28px;
+    color: #4ecca3;
+    margin-bottom: 20px;
+    text-align: center;
+    border-bottom: 2px solid #4ecca3;
+    padding-bottom: 10px;
+    width: 100%;
+}
+
+textarea {
+    background-color: #16213e;
+    color: #ffffff;
+    border: 1px solid #4ecca3;
+    border-radius: 10px;
+    padding: 15px;
+    font-size: 16px;
+    box-shadow: 0 0 10px rgba(78, 204, 163, 0.1);
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+textarea:focus {
+    outline: none;
+    border-color: #4ecca3;
+    box-shadow: 0 0 15px rgba(78, 204, 163, 0.2);
+}
+
+button {
+    padding: 12px 20px;
+    color: #ffffff;
+    border: none;
+    border-radius: 25px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    text-transform: uppercase;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+button:active {
+    transform: scale(0.98);
+    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Popup specific styles */
+.popup-body {
+    width: 400px;
+    height: 600px;
+}
+
+.popup-container {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.popup-container textarea {
+    width: 90%;
+    height: 150px;
+    margin-bottom: 20px;
+    resize: vertical;
+}
+
+.popup-button-container {
+    display: flex;
+    justify-content: space-between;
+    width: 90%;
+    margin-bottom: 20px;
+}
+
+#encryptBtn, #decryptBtn {
+    flex: 1;
+}
+
+#encryptBtn {
+    background-color: #4ecca3;
+    margin-right: 10px;
+}
+
+#encryptBtn:hover {
+    background-color: #45b393;
+}
+
+#decryptBtn {
+    background-color: #e84545;
+    margin-left: 10px;
+}
+
+#decryptBtn:hover {
+    background-color: #d63d3d;
+}
+
+#openOptions {
+    width: 90%;
+    background-color: #3d5af1;
+    margin-top: 10px;
+}
+
+#openOptions:hover {
+    background-color: #3651d9;
+}
+
+/* Options page specific styles */
+.options-body {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.options-container {
+    width: 90%;
+    max-width: 800px;
+    padding: 20px;
+    background-color: #16213e;
+    border-radius: 15px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.options-container textarea {
+    width: 90%;
+    height: 300px;
+    margin-bottom: 20px;
+}
+
+#saveBtn {
+    width: 60%;
+    background-color: #fca311;
+    margin-top: 10px;
+}
+
+#saveBtn:hover {
+    background-color: #e59100;
+}
+
+.wordlist-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 10px;
+}
+
+.icon-button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 5px;
+    margin-left: 10px;
+}
+
+.icon-button img {
+    width: 32px;
+    height: 32px;
+}
