@@ -6,14 +6,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const fileInput = document.getElementById("fileInput");
   const dropZone = document.getElementById("dropZone");
   const updateFromUrlBtn = document.getElementById("updateFromUrlBtn");
+  const autoUpdateCheckbox = document.getElementById("autoUpdate");
   const errorMsg = document.createElement("p");
   errorMsg.id = "errorMsg";
   errorMsg.style.color = "red";
   errorMsg.style.fontSize = "12px";
   document.querySelector(".options-container").appendChild(errorMsg);
 
-  chrome.storage.local.get("wordlist", (data) => {
+  chrome.storage.local.get(["wordlist", "wordlistUrl", "autoUpdate"], (data) => {
     displayWordlist(data.wordlist || {});
+    document.getElementById("urlInput").value = data.wordlistUrl || "";
+    autoUpdateCheckbox.checked = data.autoUpdate || false;
   });
 
   saveBtn.addEventListener("click", saveWordlist);
@@ -21,6 +24,9 @@ document.addEventListener("DOMContentLoaded", () => {
   downloadBtn.addEventListener("click", downloadWordlist);
   fileInput.addEventListener("change", (event) => processFile(event.target.files[0]));
   updateFromUrlBtn.addEventListener("click", updateFromUrl);
+  autoUpdateCheckbox.addEventListener("change", () => {
+    chrome.storage.local.set({ autoUpdate: autoUpdateCheckbox.checked });
+  });
 
   dropZone.addEventListener("dragover", handleDragOver);
   dropZone.addEventListener("dragleave", handleDragLeave);
@@ -164,6 +170,7 @@ function updateFromUrl() {
       console.log("Fetched text:", text.substring(0, 100) + "...");
       document.getElementById("wordlist").value = text;
       saveWordlist();
+      chrome.storage.local.set({ wordlistUrl: url });
       showError("Wordlist updated successfully from URL!", false);
     })
     .catch(error => {

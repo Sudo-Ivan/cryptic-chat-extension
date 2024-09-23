@@ -2,7 +2,7 @@
 
 ![Cryptic Chat Preview](preview/cryptic-chat-preview1.png)
 
-A Chrome V3 extension to encrypt and decrypt cryptic messages to get around censorship.
+A Chrome V3 extension to exchange cryptic messages with friends.
 
 ## Work In Progress (WIP)
 

@@ -11,7 +11,6 @@
     <div class="options-container">
         <h1>Wordlist Options</h1>
         <p>Enter each phrase pair on a new line, separating the original phrase from the cryptic phrase with a colon (:).</p>
-        <p>Example: the government is cool : veggies are good for you</p>
         <div class="wordlist-actions">
             <button id="uploadBtn" class="icon-button"><img src="../icons/upload.png" alt="Upload" title="Upload Wordlist"></button>
             <button id="downloadBtn" class="icon-button"><img src="../icons/download.png" alt="Download" title="Download Wordlist"></button>
@@ -22,6 +21,12 @@
         <div class="url-input-container">
             <input type="text" id="urlInput" placeholder="Enter HTTPS URL ending with .txt">
             <button id="updateFromUrlBtn">Update from URL</button>
+        </div>
+        <div class="auto-update-container">
+            <label for="autoUpdate">
+                <input type="checkbox" id="autoUpdate">
+                Auto-Update Wordlist from URL (Only when using URL wordlist)
+            </label>
         </div>
         <textarea id="wordlist" placeholder="Enter wordlist"></textarea>
         <button id="saveBtn">Save</button>
