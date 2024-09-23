@@ -2,7 +2,7 @@ let popupWindowId = null;
 
 chrome.runtime.onInstalled.addListener(() => {
   const defaultWordlist = {
-    "bypassing censorship is the best": "veggies are good for you"
+    "I hate veggies": "veggies are good for you"
   };
   chrome.storage.local.set({ wordlist: defaultWordlist });
 
