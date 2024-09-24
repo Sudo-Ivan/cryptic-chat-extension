@@ -102,8 +102,8 @@ button:active {
 }
 
 #openOptions {
-    width: 90%;
-    background-color: #3d5af1;
+    width: 30%;
+    background-color: #3d5bf160;
     margin-top: 10px;
 }
 
@@ -138,7 +138,7 @@ button:active {
 }
 
 #saveBtn {
-    width: 40%;
+    width: 30%;
     background-color: #fca311;
     margin-top: 10px;
 }
@@ -147,7 +147,7 @@ button:active {
     background-color: #e59100;
 }
 
-.wordlist-actions {
+.codebook-actions {
     display: flex;
     justify-content: flex-end;
     margin-bottom: 10px;
@@ -225,3 +225,12 @@ button:active {
   #updateFromUrlBtn:hover {
     background-color: #45b393;
   }
+
+/* auto-update checkbox */
+.auto-update-container {
+    margin-bottom: 10px;
+}
+
+#autoUpdate {
+    margin-right: 10px;
+}
