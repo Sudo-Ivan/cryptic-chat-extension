@@ -6,43 +6,54 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  try {
-    chrome.storage.local.get("wordlist", (data) => {
-      if (chrome.runtime.lastError) {
-        sendResponse({ error: chrome.runtime.lastError.message });
-        return;
-      }
-
-      const wordlist = data.wordlist || {};
-      let processedMessage = request.message;
-      let actionType;
-
-      if (request.action === "encrypt") {
-        for (const [key, value] of Object.entries(wordlist)) {
-          processedMessage = processedMessage.replace(new RegExp(escapeRegExp(key), 'g'), value);
+  if (isValidMessage(request)) {
+    try {
+      chrome.storage.local.get("codebook", (data) => {
+        if (chrome.runtime.lastError) {
+          sendResponse({ error: chrome.runtime.lastError.message });
+          return;
         }
-        actionType = 'encryptedMessage';
-      } else if (request.action === "decrypt") {
-        for (const [key, value] of Object.entries(wordlist)) {
-          processedMessage = processedMessage.replace(new RegExp(escapeRegExp(value), 'g'), key);
+
+        const codebook = data.codebook || {};
+        let processedMessage = request.message;
+        let actionType;
+
+        if (request.action === "encrypt") {
+          for (const key in codebook) {
+            if (codebook.hasOwnProperty(key)) {
+              processedMessage = processedMessage.replace(new RegExp(escapeRegExp(key), 'g'), codebook[key]);
+            }
+          }
+          actionType = 'encryptedMessage';
+        } else if (request.action === "decrypt") {
+          for (const key in codebook) {
+            if (codebook.hasOwnProperty(key)) {
+              processedMessage = processedMessage.replace(new RegExp(escapeRegExp(codebook[key]), 'g'), key);
+            }
+          }
+          actionType = 'decryptedMessage';
         }
-        actionType = 'decryptedMessage';
-      } else {
-        sendResponse({ error: "Unknown action" });
-        return;
-      }
 
-      let response = {};
-      response[actionType] = processedMessage;
+        let response = {};
+        response[actionType] = processedMessage;
 
-      sendResponse(response);
-    });
-  } catch (error) {
-    console.error("Error in onMessage listener: ", error);
-    sendResponse({ error: "An error occurred while processing the message" });
+        sendResponse(response);
+      });
+    } catch (error) {
+      console.error("Error in onMessage listener: ", error);
+      sendResponse({ error: "An error occurred while processing the message" });
+    }
+  } else {
+    sendResponse({ error: 'Invalid message format' });
   }
   return true;
 });
+
+function isValidMessage(request) {
+  return request &&
+         (request.action === 'encrypt' || request.action === 'decrypt') &&
+         typeof request.message === 'string';
+}
 
 function escapeRegExp(string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -50,14 +61,14 @@ function escapeRegExp(string) {
 
 function parseCrypticText() {
   try {
-    chrome.storage.local.get("wordlist", (data) => {
+    chrome.storage.local.get("codebook", (data) => {
       if (chrome.runtime.lastError) {
         console.error("Chrome runtime error: ", chrome.runtime.lastError);
         return;
       }
 
-      const wordlist = data.wordlist || {};
-      let decryptedTexts = discordParse(wordlist);
+      const codebook = data.codebook || {};
+      let decryptedTexts = discordParse(codebook);
 
       if (decryptedTexts.length > 0) {
         displayDecryptedText(decryptedTexts.join('\n\n'));

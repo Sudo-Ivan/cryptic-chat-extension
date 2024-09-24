@@ -1,10 +1,10 @@
 let popupWindowId = null;
 
 chrome.runtime.onInstalled.addListener(() => {
-  const defaultWordlist = {
+  const defaultCodebook = {
     "I hate veggies": "veggies are good for you"
   };
-  chrome.storage.local.set({ wordlist: defaultWordlist });
+  chrome.storage.local.set({ codebook: defaultCodebook });
 
   chrome.contextMenus.create({
     id: "encrypt",
@@ -21,8 +21,8 @@ chrome.runtime.onInstalled.addListener(() => {
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "encrypt" || info.menuItemId === "decrypt") {
-    chrome.storage.local.get("wordlist", (data) => {
-      processMessage(data.wordlist || {}, {
+    chrome.storage.local.get("codebook", (data) => {
+      processMessage(data.codebook || {}, {
         action: info.menuItemId,
         message: info.selectionText
       }, (response) => {
@@ -33,25 +33,37 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "encrypt" || request.action === "decrypt") {
-    chrome.storage.local.get("wordlist", (data) => {
-      processMessage(data.wordlist || {}, request, sendResponse);
+  if (isValidMessage(request)) {
+    chrome.storage.local.get("codebook", (data) => {
+      processMessage(data.codebook || {}, request, sendResponse);
     });
     return true;
+  } else {
+    sendResponse({ error: 'Invalid message format' });
   }
 });
 
-function processMessage(wordlist, request, sendResponse) {
+function isValidMessage(request) {
+  return request &&
+         (request.action === 'encrypt' || request.action === 'decrypt') &&
+         typeof request.message === 'string';
+}
+
+function processMessage(codebook, request, sendResponse) {
   let processedMessage = request.message;
   
   if (request.action === "encrypt") {
-    for (const [key, value] of Object.entries(wordlist)) {
-      processedMessage = processedMessage.replace(new RegExp(escapeRegExp(key), 'g'), value);
+    for (const key in codebook) {
+      if (codebook.hasOwnProperty(key)) {
+        processedMessage = processedMessage.replace(new RegExp(escapeRegExp(key), 'g'), codebook[key]);
+      }
     }
     sendResponse({ encryptedMessage: processedMessage });
   } else {
-    for (const [key, value] of Object.entries(wordlist)) {
-      processedMessage = processedMessage.replace(new RegExp(escapeRegExp(value), 'g'), key);
+    for (const key in codebook) {
+      if (codebook.hasOwnProperty(key)) {
+        processedMessage = processedMessage.replace(new RegExp(escapeRegExp(codebook[key]), 'g'), key);
+      }
     }
     sendResponse({ decryptedMessage: processedMessage });
   }

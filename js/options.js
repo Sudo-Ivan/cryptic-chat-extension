@@ -1,6 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const wordlistTextArea = document.getElementById("wordlist");
-  const saveBtn = document.getElementById("saveBtn");
+  const codebookTextArea = document.getElementById("codebook");
   const uploadBtn = document.getElementById("uploadBtn");
   const downloadBtn = document.getElementById("downloadBtn");
   const fileInput = document.getElementById("fileInput");
@@ -13,15 +12,15 @@ document.addEventListener("DOMContentLoaded", () => {
   errorMsg.style.fontSize = "12px";
   document.querySelector(".options-container").appendChild(errorMsg);
 
-  chrome.storage.local.get(["wordlist", "wordlistUrl", "autoUpdate"], (data) => {
-    displayWordlist(data.wordlist || {});
-    document.getElementById("urlInput").value = data.wordlistUrl || "";
+  chrome.storage.local.get(["codebook", "codebookUrl", "autoUpdate"], (data) => {
+    displayCodebook(data.codebook || {});
+    document.getElementById("urlInput").value = data.codebookUrl || "";
     autoUpdateCheckbox.checked = data.autoUpdate || false;
   });
 
-  saveBtn.addEventListener("click", saveWordlist);
+  codebookTextArea.addEventListener("input", debounce(autoSaveCodebook, 500));
   uploadBtn.addEventListener("click", () => fileInput.click());
-  downloadBtn.addEventListener("click", downloadWordlist);
+  downloadBtn.addEventListener("click", downloadCodebook);
   fileInput.addEventListener("change", (event) => processFile(event.target.files[0]));
   updateFromUrlBtn.addEventListener("click", updateFromUrl);
   autoUpdateCheckbox.addEventListener("change", () => {
@@ -33,19 +32,27 @@ document.addEventListener("DOMContentLoaded", () => {
   dropZone.addEventListener("drop", handleDrop);
 });
 
-function displayWordlist(wordlist) {
-  const wordlistTextArea = document.getElementById("wordlist");
-  let formattedWordlist = "";
-  for (const [key, value] of Object.entries(wordlist)) {
-    formattedWordlist += `${key} : ${value}\n`;
-  }
-  wordlistTextArea.value = formattedWordlist.trim();
+function debounce(func, delay) {
+  let timeoutId;
+  return function (...args) {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func.apply(this, args), delay);
+  };
 }
 
-function saveWordlist() {
-  const wordlistTextArea = document.getElementById("wordlist");
-  const lines = wordlistTextArea.value.split('\n');
-  const updatedWordlist = {};
+function displayCodebook(codebook) {
+  const codebookTextArea = document.getElementById("codebook");
+  let formattedCodebook = "";
+  for (const [key, value] of Object.entries(codebook)) {
+    formattedCodebook += `${key} : ${value}\n`;
+  }
+  codebookTextArea.value = formattedCodebook.trim();
+}
+
+function autoSaveCodebook() {
+  const codebookTextArea = document.getElementById("codebook");
+  const lines = codebookTextArea.value.split('\n');
+  const updatedCodebook = {};
   let errorLines = [];
 
   for (let i = 0; i < lines.length; i++) {
@@ -53,7 +60,7 @@ function saveWordlist() {
     if (line) {
       const [key, value] = line.split(':').map(item => item.trim());
       if (key && value) {
-        updatedWordlist[key] = value;
+        updatedCodebook[key] = value;
       } else {
         errorLines.push(i + 1);
       }
@@ -65,11 +72,11 @@ function saveWordlist() {
     return;
   }
 
-  chrome.storage.local.set({ wordlist: updatedWordlist }, () => {
+  chrome.storage.local.set({ codebook: updatedCodebook }, () => {
     if (chrome.runtime.lastError) {
-      showError("Error updating wordlist: " + chrome.runtime.lastError.message);
+      showError("Error updating codebook: " + chrome.runtime.lastError.message);
     } else {
-      showError("Wordlist updated successfully!", false);
+      showError("Codebook updated successfully!", false);
     }
   });
 }
@@ -84,21 +91,21 @@ function processFile(file) {
 
   const reader = new FileReader();
   reader.onload = function(e) {
-    document.getElementById("wordlist").value = e.target.result;
-    saveWordlist();
+    document.getElementById("codebook").value = e.target.result;
+    autoSaveCodebook();
   };
   reader.readAsText(file);
 }
 
-function downloadWordlist() {
-  const wordlistTextArea = document.getElementById("wordlist");
-  const content = wordlistTextArea.value;
+function downloadCodebook() {
+  const codebookTextArea = document.getElementById("codebook");
+  const content = codebookTextArea.value;
   const blob = new Blob([content], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);
   
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'wordlist.txt';
+  a.download = 'codebook.txt';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -131,11 +138,6 @@ function showError(message, isError = true) {
   const errorMsg = document.getElementById("errorMsg");
   errorMsg.textContent = message;
   errorMsg.style.color = isError ? "red" : "green";
-  if (isError) {
-    console.error(message);
-  } else {
-    console.log(message);
-  }
   setTimeout(() => {
     errorMsg.textContent = "";
   }, 5000);
@@ -144,8 +146,6 @@ function showError(message, isError = true) {
 function updateFromUrl() {
   const urlInput = document.getElementById("urlInput");
   let url = urlInput.value.trim();
-
-  console.log("Original URL:", url);
 
   if (!isValidUrl(url)) {
     showError("Please enter a valid HTTPS URL ending with .txt");
@@ -156,26 +156,21 @@ function updateFromUrl() {
     url = url.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/');
   }
 
-  console.log("Fetching from URL:", url);
-
   fetch(url)
     .then(response => {
-      console.log("Response status:", response.status);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       return response.text();
     })
     .then(text => {
-      console.log("Fetched text:", text.substring(0, 100) + "...");
-      document.getElementById("wordlist").value = text;
-      saveWordlist();
-      chrome.storage.local.set({ wordlistUrl: url });
-      showError("Wordlist updated successfully from URL!", false);
+      document.getElementById("codebook").value = text;
+      autoSaveCodebook();
+      chrome.storage.local.set({ codebookUrl: url });
+      showError("Codebook updated successfully from URL!", false);
     })
     .catch(error => {
-      console.error("Fetch error:", error);
-      showError("Error fetching wordlist: " + error.message);
+      showError("Error fetching codebook: " + error.message);
     });
 }
 

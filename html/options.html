@@ -3,33 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wordlist Options</title>
+    <title>Codebook Options</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../css/styles.css">
 </head>
 <body class="options-body">
     <div class="options-container">
-        <h1>Wordlist Options</h1>
+        <h1>Codebook Options</h1>
         <p>Enter each phrase pair on a new line, separating the original phrase from the cryptic phrase with a colon (:).</p>
-        <div class="wordlist-actions">
-            <button id="uploadBtn" class="icon-button"><img src="../icons/upload.png" alt="Upload" title="Upload Wordlist"></button>
-            <button id="downloadBtn" class="icon-button"><img src="../icons/download.png" alt="Download" title="Download Wordlist"></button>
+        <div class="codebook-actions">
+            <button id="uploadBtn" class="icon-button"><img src="../icons/upload.png" alt="Upload" title="Upload Codebook"></button>
+            <button id="downloadBtn" class="icon-button"><img src="../icons/download.png" alt="Download" title="Download Codebook"></button>
         </div>
         <div id="dropZone" class="drop-zone">
             <p>Drag and drop a file here</p>
         </div>
         <div class="url-input-container">
-            <input type="text" id="urlInput" placeholder="Enter HTTPS URL ending with .txt">
+            <input type="text" id="urlInput" placeholder="Enter URL ending with .txt">
             <button id="updateFromUrlBtn">Update from URL</button>
         </div>
         <div class="auto-update-container">
             <label for="autoUpdate">
                 <input type="checkbox" id="autoUpdate">
-                Auto-Update Wordlist from URL (Only when using URL wordlist)
+                Auto-Update Codebook from URL (Only when using URL codebook)
             </label>
         </div>
-        <textarea id="wordlist" placeholder="Enter wordlist"></textarea>
-        <button id="saveBtn">Save</button>
+        <textarea id="codebook" placeholder="Enter codebook"></textarea>
         <p id="errorMsg"></p>
     </div>
     <input type="file" id="fileInput" style="display: none;">
