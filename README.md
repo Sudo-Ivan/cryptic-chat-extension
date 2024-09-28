@@ -2,7 +2,9 @@
 
 ![Cryptic Chat Preview](preview/cryptic-chat-preview1.png)
 
-A Chrome V3 extension to exchange cryptic messages with friends over exisiting platforms.
+A Chrome V3 extension to exchange cryptic messages with friends over exisiting platforms. Build your own codebook and share via secure means.
+
+**Currently only works on Discord**
 
 ## Work In Progress (WIP)
 

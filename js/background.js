@@ -4,7 +4,7 @@ chrome.runtime.onInstalled.addListener(() => {
   const defaultCodebook = {
     "I hate veggies": "veggies are good for you"
   };
-  chrome.storage.local.set({ codebook: defaultCodebook });
+  chrome.storage.local.set({ codebook: defaultCodebook, messageLimit: 10 });
 
   chrome.contextMenus.create({
     id: "encrypt",
