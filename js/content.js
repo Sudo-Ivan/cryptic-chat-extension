@@ -203,6 +203,7 @@ CrypticChat.createCrypticChatWindow = function() {
     CrypticChat.makeDraggable(crypticChatWindow, header);
     CrypticChat.addIconsToWindow(crypticChatWindow);
     CrypticChat.setupInputHandler(inputArea);
+
     return crypticChatWindow;
 };
 
