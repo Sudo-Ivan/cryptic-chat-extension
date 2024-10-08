@@ -65,7 +65,7 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // Add event listeners for auto-save
-  ['messagesToLoad', 'autoScroll', 'backgroundColor', 'inputBoxColor', 'headerColor', 'windowTransparency', 'autoSend', 'messageSpacing', 'messageBubbleColor', 'messageBubbleOpacity'].forEach(id => {
+  ['messagesToLoad', 'autoScroll', 'backgroundColor', 'inputBoxColor', 'headerColor', 'windowTransparency', 'autoSend', 'messageSpacing', 'messageBubbleColor', 'messageBubbleOpacity', 'messageCheckInterval'].forEach(id => {
     document.getElementById(id).addEventListener('change', debounce(autoSave, 500));
     document.getElementById(id).addEventListener('input', debounce(autoSave, 500));
   });
@@ -132,13 +132,16 @@ function saveOptions(showMessage = true) {
         userColors: getUserColors(),
         mutedUsers: getMutedUsers(),
         autoSend: document.getElementById('autoSend').checked,
-        caseInsensitiveEncryption: document.getElementById('caseInsensitiveEncryption').checked
+        caseInsensitiveEncryption: document.getElementById('caseInsensitiveEncryption').checked,
+        messageCheckInterval: document.getElementById('messageCheckInterval').value,
     };
 
     chrome.storage.local.set(options, function() {
         if (showMessage) {
             showStatus('Options saved');
         }
+        // Notify background script to update the message check interval
+        chrome.runtime.sendMessage({ action: 'updateMessageCheckInterval' });
     });
 }
 
@@ -164,7 +167,8 @@ function loadOptions() {
     'crypticPhrase',
     'messageBubbleColor',
     'messageBubbleOpacity',
-    'caseInsensitiveEncryption'
+    'caseInsensitiveEncryption',
+    'messageCheckInterval',
   ], function(items) {
     document.getElementById('codebookText').value = formatCodebook(items.codebook || {});
     document.getElementById('messagesToLoad').value = items.messagesToLoad || 50;
@@ -187,6 +191,7 @@ function loadOptions() {
     document.getElementById('messageBubbleColor').value = items.messageBubbleColor || '#1e1e3f';
     document.getElementById('messageBubbleOpacity').value = items.messageBubbleOpacity || '70';
     document.getElementById('caseInsensitiveEncryption').checked = items.caseInsensitiveEncryption || false;
+    document.getElementById('messageCheckInterval').value = items.messageCheckInterval || 5;
   });
 }
 

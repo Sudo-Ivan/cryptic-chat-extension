@@ -258,3 +258,38 @@ chrome.windows.onRemoved.addListener((windowId) => {
     popupWindowId = null;
   }
 });
+
+let messageCheckIntervalId = null;
+
+function startMessageCheckInterval(interval) {
+    if (messageCheckIntervalId) {
+        clearInterval(messageCheckIntervalId);
+    }
+    messageCheckIntervalId = setInterval(checkForNewMessages, interval * 1000);
+}
+
+function checkForNewMessages() {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+            chrome.tabs.sendMessage(tabs[0].id, { action: 'checkForNewMessages' });
+        }
+    });
+}
+
+chrome.runtime.onInstalled.addListener(() => {
+    // ... existing code ...
+    chrome.storage.local.get('messageCheckInterval', (result) => {
+        const interval = result.messageCheckInterval || 5;
+        startMessageCheckInterval(interval);
+    });
+});
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'updateMessageCheckInterval') {
+        chrome.storage.local.get('messageCheckInterval', (result) => {
+            const interval = result.messageCheckInterval || 5;
+            startMessageCheckInterval(interval);
+        });
+    }
+    // ... existing message handling ...
+});
