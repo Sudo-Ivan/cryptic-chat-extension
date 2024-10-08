@@ -54,6 +54,10 @@
                 <label for="autoSend">Auto-Send in Discord:</label>
                 <input type="checkbox" id="autoSend" checked>
             </div>
+            <div class="option-row">
+                <label for="messageSpacing">Message Spacing (px):</label>
+                <input type="number" id="messageSpacing" min="0" max="20" value="5">
+            </div>
         </section>
         
         <section>
@@ -72,6 +76,17 @@
             </div>
             <div id="userColorContainer"></div>
             <button id="addUserColor">Add User Color</button>
+            <div class="option-row">
+                <button id="resetTheme">Reset Theme to Default</button>
+            </div>
+            <div class="option-row">
+                <label for="messageBubbleColor">Message Bubble Color:</label>
+                <input type="color" id="messageBubbleColor" value="#1e1e3f">
+            </div>
+            <div class="option-row">
+                <label for="messageBubbleOpacity">Message Bubble Opacity:</label>
+                <input type="range" id="messageBubbleOpacity" min="0" max="100" value="70">
+            </div>
         </section>
         
         <section>
@@ -83,9 +98,40 @@
             </div>
         </section>
         
+        <section>
+            <h2>Advanced Features</h2>
+            <div class="option-row">
+                <label for="destructableMessages">Enable Destructible Messages:</label>
+                <input type="checkbox" id="destructableMessages">
+            </div>
+            <div class="option-row">
+                <label for="destructKeyword">Destruction Keyword:</label>
+                <input type="text" id="destructKeyword" value="\\d ! d">
+            </div>
+            <div class="option-row">
+                <label for="crypticPhrase">Cryptic Phrase:</label>
+                <input type="text" id="crypticPhrase" value="\\d ! d">
+            </div>
+            <div class="option-row">
+                <label for="defaultDestructTime">Default Destruction Time (minutes):</label>
+                <input type="number" id="defaultDestructTime" min="1" value="5">
+            </div>
+            <div class="option-row">
+                <label for="showDestructTimer">Show Destruction Timer:</label>
+                <input type="checkbox" id="showDestructTimer" checked>
+            </div>
+            <div class="option-row">
+                <button id="exportCodebook">Export Codebook with Settings</button>
+            </div>
+        </section>
+        
         <div id="statusMsg"></div>
     </div>
     <input type="file" id="fileInput" style="display: none;">
     <script src="../js/options.js"></script>
+    <div class="save-container">
+        <button id="saveBtn" class="small-save-btn">Save</button>
+        <span id="autoSaveStatus"></span>
+    </div>
 </body>
 </html>

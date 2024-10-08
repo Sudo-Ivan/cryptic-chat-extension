@@ -136,7 +136,7 @@ button:active {
     background-color: #1a1a2e;
     border-radius: 10px;
     padding: 20px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
 }
 
 h1, h2 {
@@ -148,6 +148,17 @@ h1, h2 {
 
 section {
     margin-bottom: 30px;
+    border-bottom: 1px solid #2a2a4e;
+    padding-bottom: 20px;
+}
+
+section:last-child {
+    border-bottom: none;
+}
+
+h2 {
+    color: #4ecca3;
+    margin-bottom: 15px;
 }
 
 .option-row {
@@ -155,6 +166,18 @@ section {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 15px;
+}
+
+.option-row label {
+    flex: 1;
+    margin-right: 10px;
+}
+
+.option-row input[type="text"],
+.option-row input[type="number"],
+.option-row input[type="color"] {
+    flex: 1;
+    max-width: 200px;
 }
 
 input[type="text"],
@@ -196,20 +219,27 @@ input[type="checkbox"] {
 
 button {
     background-color: #4ecca3;
-    color: #ffffff;
+    color: #1a1a2e;
     border: none;
+    padding: 10px 15px;
     border-radius: 5px;
-    padding: 5px 10px;
     cursor: pointer;
     transition: background-color 0.3s;
+    margin-right: 10px;
 }
 
 button:hover {
     background-color: #45b393;
 }
 
+button:last-child {
+    margin-right: 0;
+}
+
 .removeUserColor {
     background-color: #e84545;
+    padding: 5px 10px;
+    font-size: 12px;
 }
 
 .removeUserColor:hover {
@@ -230,7 +260,7 @@ button:hover {
 
 #statusMsg.success {
     background-color: #4ecca3;
-    color: #ffffff;
+    color: #1a1a2e;
 }
 
 .options-container textarea {
@@ -264,8 +294,8 @@ button:hover {
 }
 
 .icon-button img {
-    width: 32px;
-    height: 32px;
+    width: 24px;
+    height: 24px;
 }
 
 .drop-zone {
@@ -373,6 +403,7 @@ button:hover {
 #addUserColor {
     margin-top: 10px;
     background-color: #4ecca3;
+    margin-bottom: 10px;
 }
 
 #addUserColor:hover {
@@ -408,4 +439,30 @@ button:hover {
 
 #addMutedUser {
     white-space: nowrap;
+}
+
+.save-container {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    margin-top: 20px;
+}
+
+.small-save-btn {
+    font-size: 14px;
+    padding: 5px 10px;
+}
+
+#autoSaveStatus {
+    margin-left: 10px;
+    font-size: 14px;
+    color: #4ecca3;
+}
+
+#exportCodebook {
+    background-color: #fca311;
+}
+
+#exportCodebook:hover {
+    background-color: #e59100;
 }
