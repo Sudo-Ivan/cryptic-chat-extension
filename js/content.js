@@ -544,7 +544,8 @@ CrypticChat.init = function() {
         'messageBubbleColor',
         'messageBubbleOpacity',
         'userColors',
-        'codebook'
+        'codebook',
+        'messageCheckInterval'  // Add this line
     ], function(items) {
         CrypticChat.messagesToLoad = items.messagesToLoad || 50;
         CrypticChat.autoScroll = items.autoScroll !== false;
@@ -562,13 +563,49 @@ CrypticChat.init = function() {
         CrypticChat.messageBubbleOpacity = items.messageBubbleOpacity || 70;
         CrypticChat.userColors = items.userColors || [];
         CrypticChat.codebook = items.codebook || {};
+        CrypticChat.messageCheckInterval = items.messageCheckInterval || 5;  // Add this line
 
         CrypticChat.updateAllStyles();
         CrypticChat.reloadMessages();
-    });
 
-    setInterval(CrypticChat.reloadMessages, 5000);
+        // Update the interval
+        if (CrypticChat.messageCheckIntervalId) {
+            clearInterval(CrypticChat.messageCheckIntervalId);
+        }
+        CrypticChat.messageCheckIntervalId = setInterval(CrypticChat.reloadMessages, CrypticChat.messageCheckInterval * 1000);
+    });
 };
+
+// Add a listener for storage changes to update the interval in real-time
+chrome.storage.onChanged.addListener(function(changes, namespace) {
+    if (namespace === 'local' && changes.messageCheckInterval) {
+        CrypticChat.messageCheckInterval = changes.messageCheckInterval.newValue;
+        if (CrypticChat.messageCheckIntervalId) {
+            clearInterval(CrypticChat.messageCheckIntervalId);
+        }
+        CrypticChat.messageCheckIntervalId = setInterval(CrypticChat.reloadMessages, CrypticChat.messageCheckInterval * 1000);
+    }
+});
+
+// Modify the existing listener to handle interval updates
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'reloadMessages') {
+        CrypticChat.reloadMessages();
+    } else if (request.action === 'updateStyles') {
+        CrypticChat.applyOptions();
+        CrypticChat.updateAllStyles();
+    } else if (request.action === 'checkForNewMessages') {
+        CrypticChat.reloadMessages();
+    } else if (request.action === 'updateMessageCheckInterval') {
+        chrome.storage.local.get('messageCheckInterval', (result) => {
+            CrypticChat.messageCheckInterval = result.messageCheckInterval || 5;
+            if (CrypticChat.messageCheckIntervalId) {
+                clearInterval(CrypticChat.messageCheckIntervalId);
+            }
+            CrypticChat.messageCheckIntervalId = setInterval(CrypticChat.reloadMessages, CrypticChat.messageCheckInterval * 1000);
+        });
+    }
+});
 
 CrypticChat.init();
 
@@ -608,15 +645,6 @@ const appMount = document.querySelector('#app-mount');
 if (appMount) {
     channelSwitchObserver.observe(appMount, { childList: true, subtree: true });
 }
-
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === 'reloadMessages') {
-        CrypticChat.reloadMessages();
-    } else if (request.action === 'updateStyles') {
-        CrypticChat.applyOptions();
-        CrypticChat.updateAllStyles();
-    }
-});
 
 // Add a listener for storage changes to update options in real-time
 chrome.storage.onChanged.addListener(function(changes, namespace) {
