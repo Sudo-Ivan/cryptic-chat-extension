@@ -1,10 +1,45 @@
 let popupWindowId = null;
+let codebook = {};
+
+function saveCodebook(newCodebook) {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.set({ codebook: newCodebook }, () => {
+      if (chrome.runtime.lastError) {
+        reject('Error saving codebook: ' + chrome.runtime.lastError.message);
+      } else {
+        codebook = newCodebook;
+        resolve();
+      }
+    });
+  });
+}
+
+function getCodebook() {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.get('codebook', (result) => {
+      if (chrome.runtime.lastError) {
+        reject('Error getting codebook: ' + chrome.runtime.lastError.message);
+      } else {
+        resolve(result.codebook || {});
+      }
+    });
+  });
+}
 
 chrome.runtime.onInstalled.addListener(() => {
-  const defaultCodebook = {
-    "I hate veggies": "veggies are good for you"
-  };
-  chrome.storage.local.set({ codebook: defaultCodebook, messageLimit: 10 });
+  getCodebook()
+    .then((loadedCodebook) => {
+      codebook = loadedCodebook;
+      if (Object.keys(codebook).length === 0) {
+        const defaultCodebook = {
+          "I hate veggies": "veggies are good for you"
+        };
+        return saveCodebook(defaultCodebook);
+      }
+    })
+    .catch((error) => console.error('Error during initialization:', error));
+
+  chrome.storage.local.set({ messageLimit: 10 });
 
   chrome.contextMenus.create({
     id: "encrypt",
@@ -17,26 +52,54 @@ chrome.runtime.onInstalled.addListener(() => {
     title: "Decrypt selected text",
     contexts: ["selection"]
   });
+
+  chrome.declarativeNetRequest.updateDynamicRules({
+    removeRuleIds: [1],
+    addRules: [{
+      id: 1,
+      priority: 1,
+      action: {
+        type: 'modifyHeaders',
+        responseHeaders: [{
+          header: 'Access-Control-Allow-Origin',
+          operation: 'set',
+          value: '*'
+        }]
+      },
+      condition: {
+        urlFilter: '*',
+        resourceTypes: ['xmlhttprequest']
+      }
+    }]
+  });
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "encrypt" || info.menuItemId === "decrypt") {
-    chrome.storage.local.get("codebook", (data) => {
-      processMessage(data.codebook || {}, {
-        action: info.menuItemId,
-        message: info.selectionText
-      }, (response) => {
-        openOrUpdatePopupWithResults(response, info.selectionText);
-      });
+    processMessage({
+      action: info.menuItemId,
+      message: info.selectionText
+    }, (response) => {
+      openOrUpdatePopupWithResults(response, info.selectionText);
     });
   }
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (isValidMessage(request)) {
-    chrome.storage.local.get("codebook", (data) => {
-      processMessage(data.codebook || {}, request, sendResponse);
+  if (request.action === 'reloadMessages') {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      chrome.tabs.sendMessage(tabs[0].id, { action: 'reloadMessages' });
     });
+  } else if (request.action === 'openOptions') {
+    chrome.runtime.openOptionsPage();
+  } else if (request.action === 'codebookUpdated') {
+    getCodebook()
+      .then((updatedCodebook) => {
+        codebook = updatedCodebook;
+      })
+      .catch((error) => console.error('Error updating codebook:', error));
+  } else if (isValidMessage(request)) {
+    processMessage(request, sendResponse);
     return true;
   } else {
     sendResponse({ error: 'Invalid message format' });
@@ -49,7 +112,7 @@ function isValidMessage(request) {
          typeof request.message === 'string';
 }
 
-function processMessage(codebook, request, sendResponse) {
+function processMessage(request, sendResponse) {
   let processedMessage = request.message;
   
   if (request.action === "encrypt") {

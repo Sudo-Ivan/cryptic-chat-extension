@@ -30,6 +30,10 @@ document.addEventListener("DOMContentLoaded", () => {
   dropZone.addEventListener("dragover", handleDragOver);
   dropZone.addEventListener("dragleave", handleDragLeave);
   dropZone.addEventListener("drop", handleDrop);
+
+  getCodebook().then((codebook) => {
+    displayCodebook(codebook);
+  });
 });
 
 function debounce(func, delay) {
@@ -72,13 +76,7 @@ function autoSaveCodebook() {
     return;
   }
 
-  chrome.storage.local.set({ codebook: updatedCodebook }, () => {
-    if (chrome.runtime.lastError) {
-      showError("Error updating codebook: " + chrome.runtime.lastError.message);
-    } else {
-      showError("Codebook updated successfully!", false);
-    }
-  });
+  saveCodebook(updatedCodebook);
 }
 
 function processFile(file) {
@@ -140,7 +138,7 @@ function showError(message, isError = true) {
   errorMsg.style.color = isError ? "red" : "green";
   setTimeout(() => {
     errorMsg.textContent = "";
-  }, 5000);
+  }, 3000);
 }
 
 function updateFromUrl() {
@@ -177,4 +175,64 @@ function updateFromUrl() {
 function isValidUrl(url) {
   return (url.startsWith('https://') && url.endsWith('.txt')) || 
          (url.startsWith('https://github.com/') && url.includes('/blob/') && url.endsWith('.txt'));
+}
+
+function saveCodebook(codebook) {
+  chrome.storage.local.set({ codebook: codebook }, function() {
+    if (chrome.runtime.lastError) {
+      showError('Error saving codebook: ' + chrome.runtime.lastError.message);
+    } else {
+      showError('Codebook updated successfully!', false);
+      chrome.runtime.sendMessage({ action: 'codebookUpdated' });
+    }
+  });
+}
+
+function getCodebook() {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.get('codebook', function(result) {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError);
+      } else {
+        resolve(result.codebook || {});
+      }
+    });
+  });
+}
+
+function uploadCodebook(event) {
+  const file = event.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const content = e.target.result;
+      const codebookTextarea = document.getElementById('codebook');
+      codebookTextarea.value = content;
+      saveCodebook(parseCodebook(content));
+    };
+    reader.readAsText(file);
+  }
+}
+
+function parseCodebook(content) {
+  const lines = content.split('\n');
+  const codebook = {};
+  lines.forEach(line => {
+    const [key, value] = line.split(':').map(item => item.trim());
+    if (key && value) {
+      codebook[key] = value;
+    }
+  });
+  return codebook;
+}
+
+function saveCodebook(codebook) {
+  chrome.storage.local.set({ codebook: codebook }, function() {
+    if (chrome.runtime.lastError) {
+      showError('Error saving codebook: ' + chrome.runtime.lastError.message);
+    } else {
+      showError('Codebook saved successfully!', false);
+      chrome.runtime.sendMessage({ action: 'codebookUpdated' });
+    }
+  });
 }
