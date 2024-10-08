@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const addMutedUserBtn = document.getElementById("addMutedUser");
   const newMutedUserInput = document.getElementById("newMutedUser");
   const resetThemeBtn = document.getElementById("resetTheme");
+  const clearDataBtn = document.getElementById('clearDataBtn');
 
   loadOptions();
 
@@ -49,6 +50,10 @@ document.addEventListener('DOMContentLoaded', function() {
       resetTheme();
       autoSave();
     });
+  }
+
+  if (clearDataBtn) {
+    clearDataBtn.addEventListener('click', clearAllData);
   }
 
   document.getElementById('exportCodebook').addEventListener('click', exportCodebook);
@@ -512,4 +517,41 @@ function autoSave() {
   chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
     chrome.tabs.sendMessage(tabs[0].id, {action: "updateStyles"});
   });
+}
+
+function clearAllData() {
+  if (confirm("Are you sure you want to clear all data and reset all values? This action cannot be undone.")) {
+    chrome.storage.local.clear(() => {
+      if (chrome.runtime.lastError) {
+        showStatus('Error clearing data: ' + chrome.runtime.lastError.message, true);
+      } else {
+        // Reset all input fields to their default values
+        document.getElementById('codebookText').value = '';
+        document.getElementById('messagesToLoad').value = '50';
+        document.getElementById('autoScroll').checked = true;
+        document.getElementById('backgroundColor').value = '#141422';
+        document.getElementById('inputBoxColor').value = '#1e1e3f';
+        document.getElementById('headerColor').value = '#1a1a40';
+        document.getElementById('windowTransparency').value = '90';
+        document.getElementById('urlInput').value = '';
+        document.getElementById('autoUpdate').checked = false;
+        document.getElementById('autoSend').checked = true;
+        document.getElementById('destructableMessages').checked = false;
+        document.getElementById('destructKeyword').value = '\\d ! d';
+        document.getElementById('defaultDestructTime').value = '5';
+        document.getElementById('showDestructTimer').checked = true;
+        document.getElementById('messageSpacing').value = '5';
+        document.getElementById('crypticPhrase').value = '\\d ! d';
+        document.getElementById('messageBubbleColor').value = '#1e1e3f';
+        document.getElementById('messageBubbleOpacity').value = '70';
+
+        // Clear user colors and muted users
+        document.getElementById('userColorContainer').innerHTML = '';
+        document.getElementById('mutedUsersContainer').innerHTML = '';
+
+        showStatus('All data cleared and values reset successfully');
+        saveOptions();
+      }
+    });
+  }
 }
