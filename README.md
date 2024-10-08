@@ -10,4 +10,5 @@ A Chrome V3 extension to exchange cryptic messages with friends over existing pl
 
 - [ ] Telegram, X, Twitch, YouTube, Forums Support
 - [ ] More options (Message limit, Themes)
-- [ ] Resizing, Moving, Minimizing and Closing Chat Window.
+- [ ] Settings icon on cryptic chat window
+- [ ] Reload icon on cryptic chat window

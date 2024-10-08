@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Cryptic Chat",
-    "version": "1.5.0",
+    "version": "1.6.0",
     "author": {
       "name": "Sudo-Ivan"
     },
@@ -9,7 +9,11 @@
     "permissions": [
       "activeTab",
       "storage",
-      "contextMenus"
+      "contextMenus",
+      "declarativeNetRequest"
+    ],
+    "host_permissions": [
+      "https://*/*"
     ],
     "background": {
       "service_worker": "js/background.js"
@@ -33,5 +37,27 @@
       "16": "icons/cryptic-logo.png",
       "48": "icons/cryptic-logo.png",
       "128": "icons/cryptic-logo.png"
+    },
+    "web_accessible_resources": [
+      {
+        "resources": [
+          "icons/*.png",
+          "fonts/*.ttf",
+          "js/decryptWorker.js"
+        ],
+        "matches": ["https://discord.com/*"]
+      }
+    ],
+    "content_security_policy": {
+      "extension_pages": "script-src 'self'; object-src 'self'; font-src 'self';"
+    },
+    "declarative_net_request": {
+      "rule_resources": [
+        {
+          "id": "ruleset_1",
+          "enabled": true,
+          "path": "rules.json"
+        }
+      ]
     }
   }
