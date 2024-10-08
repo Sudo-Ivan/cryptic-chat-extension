@@ -31,7 +31,7 @@
     "content_scripts": [
       {
         "matches": ["https://discord.com/*"],
-        "js": ["js/discord.js", "js/content.js"],
+        "js": ["js/discord.js", "js/content.js", "js/popout.js"],
         "run_at": "document_idle"
       }
     ],
@@ -44,7 +44,8 @@
       {
         "resources": [
           "icons/*.png",
-          "fonts/*.ttf"
+          "fonts/*.ttf",
+          "html/popout.html"
         ],
         "matches": ["https://discord.com/*"]
       }
