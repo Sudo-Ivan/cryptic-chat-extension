@@ -115,10 +115,11 @@ function isValidMessage(request) {
 function processMessage(request, sendResponse) {
   let processedMessage = request.message;
   
-  chrome.storage.local.get(['codebook', 'mutedUsers', 'crypticPhrase'], function(result) {
+  chrome.storage.local.get(['codebook', 'mutedUsers', 'crypticPhrase', 'caseInsensitiveEncryption'], function(result) {
     const codebook = result.codebook || {};
     const mutedUsers = result.mutedUsers || [];
     const crypticPhrase = result.crypticPhrase || '\\d ! d';
+    const caseInsensitiveEncryption = result.caseInsensitiveEncryption || false;
     
     // Check if the message is from a muted user
     const username = extractUsername(processedMessage);
@@ -130,7 +131,17 @@ function processMessage(request, sendResponse) {
     if (request.action === "encrypt") {
       for (const key in codebook) {
         if (codebook.hasOwnProperty(key)) {
-          processedMessage = processedMessage.replace(new RegExp(escapeRegExp(key), 'g'), codebook[key]);
+          const regex = caseInsensitiveEncryption 
+            ? new RegExp(escapeRegExp(key), 'gi')
+            : new RegExp(escapeRegExp(key), 'g');
+          processedMessage = processedMessage.replace(regex, (match) => {
+            const replacement = codebook[key];
+            return caseInsensitiveEncryption ? replacement : (
+              match === match.toUpperCase() ? replacement.toUpperCase() :
+              match === match.toLowerCase() ? replacement.toLowerCase() :
+              replacement
+            );
+          });
         }
       }
       // Replace default cryptic phrase with custom one
@@ -141,7 +152,16 @@ function processMessage(request, sendResponse) {
       processedMessage = processedMessage.replace(new RegExp(escapeRegExp(crypticPhrase), 'g'), '\\d ! d');
       for (const key in codebook) {
         if (codebook.hasOwnProperty(key)) {
-          processedMessage = processedMessage.replace(new RegExp(escapeRegExp(codebook[key]), 'g'), key);
+          const regex = caseInsensitiveEncryption 
+            ? new RegExp(escapeRegExp(codebook[key]), 'gi')
+            : new RegExp(escapeRegExp(codebook[key]), 'g');
+          processedMessage = processedMessage.replace(regex, (match) => {
+            return caseInsensitiveEncryption ? key : (
+              match === match.toUpperCase() ? key.toUpperCase() :
+              match === match.toLowerCase() ? key.toLowerCase() :
+              key
+            );
+          });
         }
       }
       sendResponse({ decryptedMessage: processedMessage });

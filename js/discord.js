@@ -34,6 +34,12 @@ CrypticChat.Discord = {
             const contentElement = messageElement.querySelector('[id^="message-content-"]');
             if (!contentElement) return null;
 
+            // Ignore repliedTextPreview
+            const repliedTextPreview = messageElement.querySelector('[class*="repliedTextPreview_"]');
+            if (repliedTextPreview) {
+                return null;
+            }
+
             const originalText = contentElement.textContent.trim();
             let decryptedText = originalText;
             let isDecrypted = false;
