@@ -27,9 +27,12 @@
                 <input type="text" id="urlInput" placeholder="Enter URL for remote codebook">
                 <button id="updateFromUrlBtn">Update</button>
             </div>
-            <div class="auto-update-container">
-                <input type="checkbox" id="autoUpdate">
+            <div class="auto-update-container option-row">
                 <label for="autoUpdate">Auto-update from URL</label>
+                <label class="switch">
+                    <input type="checkbox" id="autoUpdate">
+                    <span class="slider"></span>
+                </label>
             </div>
             
             <div class="drop-zone">
@@ -45,15 +48,21 @@
             </div>
             <div class="option-row">
                 <label for="autoScroll">Auto-scroll to bottom:</label>
-                <input type="checkbox" id="autoScroll" checked>
-            </div>
+                <label class="switch">
+                  <input type="checkbox" id="autoScroll" checked>
+                  <span class="slider"></span>
+                </label>
+              </div>
             <div class="option-row">
                 <label for="windowTransparency">Window Transparency:</label>
                 <input type="number" id="windowTransparency" min="0" max="100" value="90">
             </div>
             <div class="option-row">
                 <label for="autoSend">Auto-Send in Discord:</label>
-                <input type="checkbox" id="autoSend" checked>
+                <label class="switch">
+                    <input type="checkbox" id="autoSend" checked>
+                    <span class="slider"></span>
+                </label>
             </div>
             <div class="option-row">
                 <label for="messageSpacing">Message Spacing (px):</label>
@@ -103,7 +112,10 @@
             <h2>Advanced Features</h2>
             <div class="option-row">
                 <label for="destructableMessages">Enable Destructible Messages:</label>
-                <input type="checkbox" id="destructableMessages">
+                <label class="switch">
+                    <input type="checkbox" id="destructableMessages">
+                    <span class="slider"></span>
+                </label>
             </div>
             <div class="option-row">
                 <label for="destructKeyword">Destruction Keyword:</label>
@@ -119,11 +131,17 @@
             </div>
             <div class="option-row">
                 <label for="showDestructTimer">Show Destruction Timer:</label>
-                <input type="checkbox" id="showDestructTimer" checked>
+                <label class="switch">
+                    <input type="checkbox" id="showDestructTimer" checked>
+                    <span class="slider"></span>
+                </label>
             </div>
             <div class="option-row">
                 <label for="caseInsensitiveEncryption">Case-insensitive Encryption (Codebook):</label>
-                <input type="checkbox" id="caseInsensitiveEncryption">
+                <label class="switch">
+                    <input type="checkbox" id="caseInsensitiveEncryption">
+                    <span class="slider"></span>
+                </label>
             </div>
             <div class="option-row">
                 <label for="messageCheckInterval">Check for new messages every (seconds):</label>
@@ -140,14 +158,13 @@
                 <button id="exportCodebook">Export Codebook with Settings</button>
             </div>
         </section>
-        
+        <span id="autoSaveStatus"></span>
         <div id="statusMsg"></div>
     </div>
     <input type="file" id="fileInput" style="display: none;">
     <script src="../js/options.js"></script>
     <div class="save-container">
         <button id="saveBtn" class="small-save-btn">Save</button>
-        <span id="autoSaveStatus"></span>
     </div>
 </body>
 </html>
