@@ -127,22 +127,110 @@ button:active {
 
 /* Options page specific styles */
 .options-body {
-    min-height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
 }
 
 .options-container {
-    width: 90%;
-    max-width: 800px;
+    background-color: #1a1a2e;
+    border-radius: 10px;
     padding: 20px;
-    background-color: #16213e;
-    border-radius: 15px;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+h1, h2 {
+    color: #4ecca3;
+    border-bottom: 2px solid #4ecca3;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+section {
+    margin-bottom: 30px;
+}
+
+.option-row {
     display: flex;
-    flex-direction: column;
+    justify-content: space-between;
     align-items: center;
+    margin-bottom: 15px;
+}
+
+input[type="text"],
+input[type="number"],
+input[type="color"] {
+    background-color: #16213e;
+    color: #ffffff;
+    border: 1px solid #4ecca3;
+    border-radius: 5px;
+    padding: 5px 10px;
+}
+
+input[type="color"] {
+    width: 50px;
+    height: 30px;
+    padding: 0;
+    border: none;
+}
+
+input[type="checkbox"] {
+    margin-right: 10px;
+}
+
+.user-color-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.user-color-row input[type="text"] {
+    flex-grow: 1;
+    margin-right: 10px;
+}
+
+.user-color-row input[type="color"] {
+    margin-right: 10px;
+}
+
+button {
+    background-color: #4ecca3;
+    color: #ffffff;
+    border: none;
+    border-radius: 5px;
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+button:hover {
+    background-color: #45b393;
+}
+
+.removeUserColor {
+    background-color: #e84545;
+}
+
+.removeUserColor:hover {
+    background-color: #d63d3d;
+}
+
+#statusMsg {
+    margin-top: 20px;
+    padding: 10px;
+    border-radius: 5px;
+    text-align: center;
+}
+
+#statusMsg.error {
+    background-color: #e84545;
+    color: #ffffff;
+}
+
+#statusMsg.success {
+    background-color: #4ecca3;
+    color: #ffffff;
 }
 
 .options-container textarea {
@@ -247,4 +335,77 @@ button:active {
 
 #autoUpdate {
     margin-right: 10px;
+}
+
+/* Add these styles to the existing CSS file */
+
+.option-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 90%;
+    margin-bottom: 10px;
+}
+
+.option-row input[type="number"],
+.option-row input[type="color"] {
+    width: 100px;
+}
+
+.user-color-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 90%;
+    margin-bottom: 10px;
+}
+
+.user-color-row input[type="text"] {
+    flex-grow: 1;
+    margin-right: 10px;
+}
+
+.user-color-row input[type="color"] {
+    width: 50px;
+    margin-right: 10px;
+}
+
+#addUserColor {
+    margin-top: 10px;
+    background-color: #4ecca3;
+}
+
+#addUserColor:hover {
+    background-color: #45b393;
+}
+
+.removeUserColor {
+    background-color: #e84545;
+    padding: 5px 10px;
+    font-size: 12px;
+}
+
+.removeUserColor:hover {
+    background-color: #d63d3d;
+}
+
+.muted-user {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.muted-user span {
+    flex-grow: 1;
+    margin-right: 10px;
+}
+
+#newMutedUser {
+    flex-grow: 1;
+    margin-right: 10px;
+}
+
+#addMutedUser {
+    white-space: nowrap;
 }
