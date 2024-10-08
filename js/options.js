@@ -104,7 +104,15 @@ async function handleFileUpload(file) {
   reader.onload = async function(e) {
     try {
       const content = e.target.result;
-      const importedData = JSON.parse(content);
+      let importedData;
+
+      if (file.name.endsWith('.txt')) {
+        importedData = { codebook: parseTxtCodebook(content) };
+      } else if (file.name.endsWith('.json')) {
+        importedData = JSON.parse(content);
+      } else {
+        throw new Error('Unsupported file type');
+      }
 
       if (importedData.encrypted) {
         const password = prompt('Please enter the password to decrypt the imported codebook:');
@@ -124,7 +132,17 @@ async function handleFileUpload(file) {
   reader.readAsText(file);
 }
 
-// Add these functions to handle the new features
+function parseTxtCodebook(content) {
+  const lines = content.split('\n');
+  const codebook = {};
+  lines.forEach(line => {
+    const [key, value] = line.split(':').map(item => item.trim());
+    if (key && value) {
+      codebook[key] = value;
+    }
+  });
+  return codebook;
+}
 
 function exportCodebookTxt() {
     const codebookText = document.getElementById("codebookText").value;
@@ -241,12 +259,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
   document.getElementById('saveBtn').addEventListener('click', () => saveOptions(true));
 
-  // Add event listeners for auto-save
   ['messageBubbleColor', 'messageBubbleOpacity', 'destructableMessages', 'destructKeyword', 'crypticPhrase', 'defaultDestructTime', 'showDestructTimer'].forEach(id => {
     document.getElementById(id).addEventListener('change', debounce(autoSave, 500));
   });
 
-  // Add event listeners for auto-save
   ['messagesToLoad', 'autoScroll', 'backgroundColor', 'inputBoxColor', 'headerColor', 'windowTransparency', 'autoSend', 'messageSpacing', 'messageBubbleColor', 'messageBubbleOpacity', 'messageCheckInterval'].forEach(id => {
     document.getElementById(id).addEventListener('change', debounce(autoSave, 500));
     document.getElementById(id).addEventListener('input', debounce(autoSave, 500));
@@ -269,6 +285,59 @@ document.addEventListener('DOMContentLoaded', function() {
     originalCodebook = codebookTextArea.value;
   }
 });
+
+function handleDragOver(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  e.dataTransfer.dropEffect = 'copy';
+  this.classList.add('dragover');
+}
+
+function handleDragLeave(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  this.classList.remove('dragover');
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  this.classList.remove('dragover');
+  const files = e.dataTransfer.files;
+  if (files.length > 0) {
+    handleFileUpload(files[0]);
+  }
+}
+
+function handleImportedData(importedData) {
+  try {
+    if (importedData.codebook) {
+      document.getElementById('codebookText').value = formatCodebook(importedData.codebook);
+      chrome.storage.local.set({ codebook: importedData.codebook });
+    }
+
+    if (importedData.destructableMessages !== undefined) {
+      document.getElementById('destructableMessages').checked = importedData.destructableMessages;
+    }
+    if (importedData.destructKeyword) {
+      document.getElementById('destructKeyword').value = importedData.destructKeyword;
+    }
+    if (importedData.crypticPhrase) {
+      document.getElementById('crypticPhrase').value = importedData.crypticPhrase;
+    }
+    if (importedData.defaultDestructTime) {
+      document.getElementById('defaultDestructTime').value = importedData.defaultDestructTime;
+    }
+    if (importedData.showDestructTimer !== undefined) {
+      document.getElementById('showDestructTimer').checked = importedData.showDestructTimer;
+    }
+
+    saveOptions();
+    showStatus('Codebook and settings imported successfully!');
+  } catch (error) {
+    showStatus('Error processing imported data: ' + error.message, true);
+  }
+}
 
 function debounce(func, delay) {
   let timeoutId;
@@ -456,29 +525,6 @@ function showStatus(message, isError = false) {
   }, 3000);
 }
 
-function handleDragOver(e) {
-  e.preventDefault();
-  e.stopPropagation();
-  e.dataTransfer.dropEffect = 'copy';
-  this.classList.add('dragover');
-}
-
-function handleDragLeave(e) {
-  e.preventDefault();
-  e.stopPropagation();
-  this.classList.remove('dragover');
-}
-
-function handleDrop(e) {
-  e.preventDefault();
-  e.stopPropagation();
-  this.classList.remove('dragover');
-  const files = e.dataTransfer.files;
-  if (files.length > 0) {
-    handleFileUpload(files[0]);
-  }
-}
-
 function updateFromUrl() {
   const urlInput = document.getElementById("urlInput");
   let url = urlInput.value.trim();
@@ -644,39 +690,5 @@ function clearAllData() {
         saveOptions();
       }
     });
-  }
-}
-
-function handleImportedData(importedData) {
-  try {
-    // Update codebook
-    if (importedData.codebook) {
-      document.getElementById('codebookText').value = formatCodebook(importedData.codebook);
-      chrome.storage.local.set({ codebook: importedData.codebook });
-    }
-
-    // Update other settings
-    if (importedData.destructableMessages !== undefined) {
-      document.getElementById('destructableMessages').checked = importedData.destructableMessages;
-    }
-    if (importedData.destructKeyword) {
-      document.getElementById('destructKeyword').value = importedData.destructKeyword;
-    }
-    if (importedData.crypticPhrase) {
-      document.getElementById('crypticPhrase').value = importedData.crypticPhrase;
-    }
-    if (importedData.defaultDestructTime) {
-      document.getElementById('defaultDestructTime').value = importedData.defaultDestructTime;
-    }
-    if (importedData.showDestructTimer !== undefined) {
-      document.getElementById('showDestructTimer').checked = importedData.showDestructTimer;
-    }
-
-    // Save the imported settings
-    saveOptions();
-
-    showStatus('Codebook and settings imported successfully!');
-  } catch (error) {
-    showStatus('Error processing imported data: ' + error.message, true);
   }
 }
