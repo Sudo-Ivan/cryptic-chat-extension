@@ -157,28 +157,6 @@ CrypticChat.Discord = {
         }
     },
 
-    syncScroll: function() {
-        const discordScroller = document.querySelector('[class^="scroller_"]');
-        const popupContainer = document.querySelector('.popup-container');
-        if (!popupContainer) return;
-        const resultArea = popupContainer.querySelector('#resultArea');
-
-        if (!discordScroller || !resultArea) return;
-
-        discordScroller.addEventListener('scroll', () => {
-            const scrollPercentage = discordScroller.scrollTop / (discordScroller.scrollHeight - discordScroller.clientHeight);
-            resultArea.scrollTop = scrollPercentage * (resultArea.scrollHeight - resultArea.clientHeight);
-        });
-
-        resultArea.addEventListener('scroll', () => {
-            const scrollPercentage = resultArea.scrollTop / (resultArea.scrollHeight - resultArea.clientHeight);
-            discordScroller.scrollTop = scrollPercentage * (discordScroller.scrollHeight - discordScroller.clientHeight);
-        });
-    },
-
-    init: function() {
-        this.syncScroll();
-    }
 };
 
 // Initialize Discord-specific functionality

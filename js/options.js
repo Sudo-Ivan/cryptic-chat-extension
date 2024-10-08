@@ -374,7 +374,7 @@ function updateFromUrl() {
   let url = urlInput.value.trim();
 
   if (!isValidUrl(url)) {
-    showStatus("Please enter a valid HTTPS URL ending with .txt", true);
+    showStatus("Please enter a valid GitHub URL ending with .txt or .json", true);
     return;
   }
 
@@ -390,7 +390,20 @@ function updateFromUrl() {
       return response.text();
     })
     .then(text => {
-      document.getElementById("codebookText").value = text;
+      if (url.endsWith('.json')) {
+        try {
+          const jsonData = JSON.parse(text);
+          if (jsonData.codebook) {
+            document.getElementById("codebookText").value = formatCodebook(jsonData.codebook);
+          } else {
+            document.getElementById("codebookText").value = formatCodebook(jsonData);
+          }
+        } catch (error) {
+          throw new Error("Invalid JSON format");
+        }
+      } else {
+        document.getElementById("codebookText").value = text;
+      }
       autoSaveCodebook();
       chrome.storage.local.set({ url: url });
       showStatus("Codebook updated successfully from URL!", false);
@@ -401,8 +414,8 @@ function updateFromUrl() {
 }
 
 function isValidUrl(url) {
-  return (url.startsWith('https://') && url.endsWith('.txt')) || 
-         (url.startsWith('https://github.com/') && url.includes('/blob/') && url.endsWith('.txt'));
+  return (url.startsWith('https://raw.githubusercontent.com/') && (url.endsWith('.txt') || url.endsWith('.json'))) || 
+         (url.startsWith('https://github.com/') && url.includes('/blob/') && (url.endsWith('.txt') || url.endsWith('.json')));
 }
 
 function getMutedUsers() {
