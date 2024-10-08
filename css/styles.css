@@ -69,20 +69,20 @@ button:active {
 /* Popup specific styles */
 .popup-body {
     width: 400px;
-    height: 600px;
+    height: 700px;
 }
 
 .popup-container {
-    padding: 20px;
+    padding: 30px;
     display: flex;
     flex-direction: column;
     align-items: center;
 }
 
 .popup-container textarea {
-    width: 90%;
+    width: 95%;
     height: 150px;
-    margin-bottom: 20px;
+    margin-bottom: 25px;
     resize: vertical;
 }
 
@@ -116,9 +116,8 @@ button:active {
 }
 
 #openOptions {
-    width: 30%;
-    background-color: #3d5bf160;
-    margin-top: 10px;
+    width: 40%;
+    background-color: #3d5bf1;
 }
 
 #openOptions:hover {
@@ -165,7 +164,8 @@ h2 {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 15px;
+    width: 90%;
+    margin-bottom: 10px;
 }
 
 .option-row label {
@@ -175,14 +175,16 @@ h2 {
 
 .option-row input[type="text"],
 .option-row input[type="number"],
-.option-row input[type="color"] {
+.option-row input[type="color"],
+.option-row input[type="password"] {
     flex: 1;
     max-width: 200px;
 }
 
 input[type="text"],
 input[type="number"],
-input[type="color"] {
+input[type="color"],
+input[type="password"] {
     background-color: #16213e;
     color: #ffffff;
     border: 1px solid #4ecca3;
@@ -359,7 +361,6 @@ button:last-child {
     background-color: #45b393;
   }
 
-/* auto-update checkbox */
 .auto-update-container {
     margin-bottom: 10px;
 }
@@ -368,7 +369,6 @@ button:last-child {
     margin-right: 10px;
 }
 
-/* Add these styles to the existing CSS file */
 
 .option-row {
     display: flex;
@@ -479,6 +479,7 @@ button:last-child {
 .danger-btn:hover {
     background-color: #d63d3d;
 }
+
 /* Custom checkbox (switch) styles */
 .switch {
   position: relative;
@@ -530,7 +531,6 @@ input:checked + .slider:before {
   transform: translateX(20px);
 }
 
-/* Adjust the option row for the new switch style */
 .option-row {
   display: flex;
   justify-content: space-between;
@@ -543,7 +543,53 @@ input:checked + .slider:before {
   margin-right: 10px;
 }
 
-/* Add this to override the previous checkbox styles */
 .option-row input[type="checkbox"] {
   margin-right: 0;
+}
+
+
+#fileInput {
+  display: none;
+}
+
+#importBtn {
+  background-color: #3d5bf1;
+  color: #ffffff;
+}
+
+#importBtn:hover {
+  background-color: #3651d9;
+}
+
+#codebookSearch {
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 5px;
+    border-radius: 5px;
+    border: 1px solid #4ecca3;
+    background-color: #16213e;
+    color: #ffffff;
+}
+
+#exportCodebookTxt {
+    background-color: #4ecca3;
+    color: #1a1a2e;
+}
+
+#exportCodebookTxt:hover {
+    background-color: #45b393;
+}
+
+#exportCodebookTxt:disabled {
+    background-color: #cccccc;
+    color: #666666;
+    cursor: not-allowed;
+}
+
+.phrase-count {
+    color: #4ecca3;
+    font-size: 14px;
+    margin-bottom: 15px;
+    text-align: right;
+    width: 100%;
 }

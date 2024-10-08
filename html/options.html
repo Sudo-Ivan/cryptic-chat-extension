@@ -13,30 +13,34 @@
         <section>
             <h2>Codebook</h2>
             <div class="codebook-actions">
-                <button class="icon-button" id="downloadBtn" title="Download Codebook">
-                    <img src="../icons/download.png" alt="Download">
+                <button class="icon-button" id="downloadBtn" title="Export Codebook">
+                    <img src="../icons/download.png" alt="Export">
                 </button>
-                <button class="icon-button" id="uploadBtn" title="Upload Codebook">
-                    <img src="../icons/upload.png" alt="Upload">
+                <button class="icon-button" id="uploadBtn" title="Import Codebook">
+                    <img src="../icons/upload.png" alt="Import">
                 </button>
             </div>
+            <div class="option-row">
+                <input type="text" id="codebookSearch" placeholder="Search codebook...">
+            </div>
             <textarea id="codebookText" placeholder="Enter your codebook here..."></textarea>
+            <div id="codebookPhraseCount" class="phrase-count">Phrases: 0</div>
+            <div class="drop-zone">
+                <p>Drag and drop a codebook file here</p>
+            </div>
             <div id="statusMsg"></div>
             
             <div class="url-input-container">
                 <input type="text" id="urlInput" placeholder="Enter URL for remote codebook">
                 <button id="updateFromUrlBtn">Update</button>
             </div>
+            
             <div class="auto-update-container option-row">
                 <label for="autoUpdate">Auto-update from URL</label>
                 <label class="switch">
                     <input type="checkbox" id="autoUpdate">
                     <span class="slider"></span>
                 </label>
-            </div>
-            
-            <div class="drop-zone">
-                <p>Drag and drop a codebook file here</p>
             </div>
         </section>
         
@@ -150,6 +154,21 @@
         </section>
         
         <section>
+            <h2>Codebook Encryption</h2>
+            <div class="option-row">
+                <label for="useCodebookEncryption">Use encryption for codebook export/import:</label>
+                <label class="switch">
+                    <input type="checkbox" id="useCodebookEncryption">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="option-row">
+                <label for="codebookPassword">Codebook Password:</label>
+                <input type="password" id="codebookPassword" disabled>
+            </div>
+        </section>
+        
+        <section>
             <h2>Data Management</h2>
             <div class="option-row">
                 <button id="clearDataBtn" class="danger-btn">Clear All Data and Reset Values</button>
@@ -157,11 +176,13 @@
             <div class="option-row">
                 <button id="exportCodebook">Export Codebook with Settings</button>
             </div>
+            <div class="option-row">
+                <button id="exportCodebookTxt" disabled>Export Codebook.txt</button>
+            </div>
         </section>
         <span id="autoSaveStatus"></span>
         <div id="statusMsg"></div>
     </div>
-    <input type="file" id="fileInput" style="display: none;">
     <script src="../js/options.js"></script>
     <div class="save-container">
         <button id="saveBtn" class="small-save-btn">Save</button>

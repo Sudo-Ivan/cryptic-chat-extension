@@ -203,7 +203,6 @@ CrypticChat.Discord = {
     },
 
     init: function() {
-        // Any initialization code for Discord-specific functionality
     }
 };
 
