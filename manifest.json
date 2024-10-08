@@ -25,12 +25,13 @@
           "48": "icons/cryptic-logo.png",
           "128": "icons/cryptic-logo.png"
         }
-      },
+    },
     "options_page": "html/options.html",
     "content_scripts": [
       {
         "matches": ["https://discord.com/*"],
-        "js": ["js/content.js", "js/discord.js"]
+        "js": ["js/discord.js", "js/content.js"],
+        "run_at": "document_idle"
       }
     ],
     "icons": {
@@ -42,15 +43,11 @@
       {
         "resources": [
           "icons/*.png",
-          "fonts/*.ttf",
-          "js/decryptWorker.js"
+          "fonts/*.ttf"
         ],
         "matches": ["https://discord.com/*"]
       }
     ],
-    "content_security_policy": {
-      "extension_pages": "script-src 'self'; object-src 'self'; font-src 'self';"
-    },
     "declarative_net_request": {
       "rule_resources": [
         {
@@ -59,5 +56,8 @@
           "path": "rules.json"
         }
       ]
+    },
+    "content_security_policy": {
+      "extension_pages": "script-src 'self'; object-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: https://*.discord.com; connect-src 'self' https://*.discord.com wss://*.discord.com; frame-src 'self' https://*.discord.com"
     }
-  }
+}
