@@ -434,12 +434,19 @@ function addMutedUserElement(username) {
   const element = document.createElement('div');
   element.className = 'muted-user option-row';
   element.dataset.username = username;
-  element.innerHTML = `
-    <span>${username}</span>
-    <button class="removeMutedUser">Remove</button>
-  `;
+
+  const span = document.createElement('span');
+  span.textContent = username;
+  element.appendChild(span);
+
+  const button = document.createElement('button');
+  button.className = 'removeMutedUser';
+  button.textContent = 'Remove';
+  element.appendChild(button);
+
   container.appendChild(element);
-  element.querySelector('.removeMutedUser').addEventListener('click', () => {
+
+  button.addEventListener('click', () => {
     container.removeChild(element);
     saveOptions();
   });
