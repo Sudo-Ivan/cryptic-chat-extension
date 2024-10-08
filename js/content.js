@@ -4,7 +4,10 @@ CrypticChat.escapeRegExp = function(string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 };
 
-CrypticChat.createCrypticChatWindow = function() {
+CrypticChat.isPopout = false;
+
+CrypticChat.createCrypticChatWindow = function(isPopout = false) {
+    CrypticChat.isPopout = isPopout;
     let crypticChatWindow = document.getElementById('crypticChatWindow');
     if (crypticChatWindow) return crypticChatWindow;
 
@@ -304,125 +307,134 @@ CrypticChat.applyMessageBubbleStyle = function() {
 };
 
 CrypticChat.updateCrypticChatWindow = function(decryptedTexts) {
-    const crypticChatWindow = CrypticChat.createCrypticChatWindow();
-    const messagesContainer = crypticChatWindow.querySelector('.cryptic-chat-content');
-    
-    // Clear the messages container if no decrypted texts
-    if (decryptedTexts.length === 0) {
-        messagesContainer.innerHTML = '';
-        return;
-    }
-    
-    const existingMessages = new Set(
-        Array.from(messagesContainer.children).map(child => child.textContent)
-    );
-
-    let newMessagesAdded = false;
-
-    // Clear existing messages that are not in the new decrypted texts
-    Array.from(messagesContainer.children).forEach(child => {
-        if (!decryptedTexts.includes(child.textContent)) {
-            messagesContainer.removeChild(child);
+    if (CrypticChat.isPopout) {
+        // If it's a popout, update the popout window
+        window.opener.postMessage({
+            action: 'updateCrypticChat',
+            decryptedTexts: decryptedTexts
+        }, '*');
+    } else {
+        // Existing code for updating the in-page window
+        const crypticChatWindow = CrypticChat.createCrypticChatWindow();
+        const messagesContainer = crypticChatWindow.querySelector('.cryptic-chat-content');
+        
+        // Clear the messages container if no decrypted texts
+        if (decryptedTexts.length === 0) {
+            messagesContainer.innerHTML = '';
+            return;
         }
-    });
+        
+        const existingMessages = new Set(
+            Array.from(messagesContainer.children).map(child => child.textContent)
+        );
 
-    decryptedTexts.forEach(text => {
-        if (!existingMessages.has(text)) {
-            existingMessages.add(text);
-            const messageElement = document.createElement('div');
-            messageElement.className = 'cryptic-chat-message';
-            
-            const [username, ...messageParts] = text.split(':');
-            const message = messageParts.join(':').trim();
-            const timestamp = message.match(/- (\d{2}:\d{2})/);
+        let newMessagesAdded = false;
 
-            const usernameSpan = document.createElement('span');
-            usernameSpan.className = 'cryptic-chat-username';
-            usernameSpan.textContent = username;
+        // Clear existing messages that are not in the new decrypted texts
+        Array.from(messagesContainer.children).forEach(child => {
+            if (!decryptedTexts.includes(child.textContent)) {
+                messagesContainer.removeChild(child);
+            }
+        });
 
-            const messageSpan = document.createElement('span');
-            messageSpan.className = 'cryptic-chat-text';
-            messageSpan.textContent = message.replace(/- \d{2}:\d{2}$/, '').trim();
-
-            const timestampSpan = document.createElement('span');
-            timestampSpan.className = 'cryptic-chat-timestamp';
-            timestampSpan.textContent = timestamp ? timestamp[1] : '';
-
-            messageElement.appendChild(usernameSpan);
-            messageElement.appendChild(messageSpan);
-            messageElement.appendChild(timestampSpan);
-
-            // Check if it's a destructible message
-            const destructMatch = text.match(/\\d ! d(\d+)\/\//);
-            if (destructMatch) {
-                const destructMinutes = parseInt(destructMatch[1]);
-                const messageTime = new Date().getTime();
+        decryptedTexts.forEach(text => {
+            if (!existingMessages.has(text)) {
+                existingMessages.add(text);
+                const messageElement = document.createElement('div');
+                messageElement.className = 'cryptic-chat-message';
                 
-                // Set a timeout to remove the message
-                const timeoutId = setTimeout(() => {
-                    if (messagesContainer.contains(messageElement)) {
-                        messagesContainer.removeChild(messageElement);
+                const [username, ...messageParts] = text.split(':');
+                const message = messageParts.join(':').trim();
+                const timestamp = message.match(/- (\d{2}:\d{2})/);
+
+                const usernameSpan = document.createElement('span');
+                usernameSpan.className = 'cryptic-chat-username';
+                usernameSpan.textContent = username;
+
+                const messageSpan = document.createElement('span');
+                messageSpan.className = 'cryptic-chat-text';
+                messageSpan.textContent = message.replace(/- \d{2}:\d{2}$/, '').trim();
+
+                const timestampSpan = document.createElement('span');
+                timestampSpan.className = 'cryptic-chat-timestamp';
+                timestampSpan.textContent = timestamp ? timestamp[1] : '';
+
+                messageElement.appendChild(usernameSpan);
+                messageElement.appendChild(messageSpan);
+                messageElement.appendChild(timestampSpan);
+
+                // Check if it's a destructible message
+                const destructMatch = text.match(/\\d ! d(\d+)\/\//);
+                if (destructMatch) {
+                    const destructMinutes = parseInt(destructMatch[1]);
+                    const messageTime = new Date().getTime();
+                    
+                    // Set a timeout to remove the message
+                    const timeoutId = setTimeout(() => {
+                        if (messagesContainer.contains(messageElement)) {
+                            messagesContainer.removeChild(messageElement);
+                        }
+                    }, destructMinutes * 60 * 1000);
+
+                    // Store the timeout ID and destruction time
+                    messageElement.dataset.timeoutId = timeoutId;
+                    messageElement.dataset.destructTime = messageTime + (destructMinutes * 60 * 1000);
+
+                    // Remove the destruction keyword from the displayed message
+                    messageElement.textContent = text.replace(destructMatch[0], '').trim();
+
+                    // Add timer if enabled
+                    if (CrypticChat.showDestructTimer) {
+                        const timerElement = document.createElement('span');
+                        timerElement.className = 'destruct-timer';
+                        messageElement.appendChild(timerElement);
+
+                        const updateTimer = () => {
+                            if (!messagesContainer.contains(messageElement)) {
+                                return; // Stop updating if the element is no longer in the container
+                            }
+                            const remainingTime = Math.max(0, (messageElement.dataset.destructTime - new Date().getTime()) / 1000);
+                            const minutes = Math.floor(remainingTime / 60);
+                            const seconds = Math.floor(remainingTime % 60);
+                            timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+                            if (remainingTime > 0) {
+                                requestAnimationFrame(updateTimer);
+                            }
+                        };
+
+                        updateTimer();
                     }
-                }, destructMinutes * 60 * 1000);
-
-                // Store the timeout ID and destruction time
-                messageElement.dataset.timeoutId = timeoutId;
-                messageElement.dataset.destructTime = messageTime + (destructMinutes * 60 * 1000);
-
-                // Remove the destruction keyword from the displayed message
-                messageElement.textContent = text.replace(destructMatch[0], '').trim();
-
-                // Add timer if enabled
-                if (CrypticChat.showDestructTimer) {
-                    const timerElement = document.createElement('span');
-                    timerElement.className = 'destruct-timer';
-                    messageElement.appendChild(timerElement);
-
-                    const updateTimer = () => {
-                        if (!messagesContainer.contains(messageElement)) {
-                            return; // Stop updating if the element is no longer in the container
-                        }
-                        const remainingTime = Math.max(0, (messageElement.dataset.destructTime - new Date().getTime()) / 1000);
-                        const minutes = Math.floor(remainingTime / 60);
-                        const seconds = Math.floor(remainingTime % 60);
-                        timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-
-                        if (remainingTime > 0) {
-                            requestAnimationFrame(updateTimer);
-                        }
-                    };
-
-                    updateTimer();
                 }
+                
+                // Apply user color if matched
+                const userColor = CrypticChat.userColors.find(uc => uc.username === username);
+                if (userColor) {
+                    messageElement.style.color = userColor.color;
+                }
+                
+                // Placeholder for images
+                if (text.includes('[IMAGE]')) {
+                    const imgPlaceholder = document.createElement('div');
+                    imgPlaceholder.className = 'cryptic-chat-image';
+                    imgPlaceholder.textContent = '[Image Placeholder]';
+                    imgPlaceholder.style.backgroundColor = '#30305a';
+                    imgPlaceholder.style.color = '#ffffff';
+                    imgPlaceholder.style.textAlign = 'center';
+                    imgPlaceholder.style.lineHeight = '200px';
+                    messageElement.appendChild(imgPlaceholder);
+                }
+                
+                messagesContainer.appendChild(messageElement);
+                newMessagesAdded = true;
             }
-            
-            // Apply user color if matched
-            const userColor = CrypticChat.userColors.find(uc => uc.username === username);
-            if (userColor) {
-                messageElement.style.color = userColor.color;
-            }
-            
-            // Placeholder for images
-            if (text.includes('[IMAGE]')) {
-                const imgPlaceholder = document.createElement('div');
-                imgPlaceholder.className = 'cryptic-chat-image';
-                imgPlaceholder.textContent = '[Image Placeholder]';
-                imgPlaceholder.style.backgroundColor = '#30305a';
-                imgPlaceholder.style.color = '#ffffff';
-                imgPlaceholder.style.textAlign = 'center';
-                imgPlaceholder.style.lineHeight = '200px';
-                messageElement.appendChild(imgPlaceholder);
-            }
-            
-            messagesContainer.appendChild(messageElement);
-            newMessagesAdded = true;
+        });
+
+        CrypticChat.applyMessageSpacing();
+
+        if (newMessagesAdded && CrypticChat.autoScroll) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
-    });
-
-    CrypticChat.applyMessageSpacing();
-
-    if (newMessagesAdded && CrypticChat.autoScroll) {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 };
 
@@ -443,11 +455,13 @@ CrypticChat.addIconsToWindow = function(crypticChatWindow) {
     const settingsIcon = createIcon('icons/settings-light.png', 'settingsIcon', 'Settings', CrypticChat.openOptions);
     const minimizeIcon = createIcon('icons/minimize.png', 'minimizeIcon', 'Minimize', () => CrypticChat.toggleMinimize(crypticChatWindow));
     const closeIcon = createIcon('icons/close.png', 'closeIcon', 'Close', () => crypticChatWindow.remove());
+    const popoutIcon = createIcon('icons/popout.png', 'popoutIcon', 'Popout', CrypticChat.togglePopout);
 
     controlsContainer.appendChild(reloadIcon);
     controlsContainer.appendChild(settingsIcon);
     controlsContainer.appendChild(minimizeIcon);
     controlsContainer.appendChild(closeIcon);
+    controlsContainer.appendChild(popoutIcon);
 };
 
 CrypticChat.toggleMinimize = function(crypticChatWindow) {
@@ -669,4 +683,32 @@ CrypticChat.updateAllStyles = function() {
         CrypticChat.applyMessageSpacing();
         CrypticChat.applyMessageBubbleStyle();
     }
+};
+
+CrypticChat.togglePopout = function() {
+    if (CrypticChat.isPopout) {
+        window.close();
+    } else {
+        const crypticChatWindow = document.getElementById('crypticChatWindow');
+        if (crypticChatWindow) {
+            crypticChatWindow.remove();
+        }
+        CrypticChatPopout.openPopout();
+    }
+};
+
+// Add this function to handle message passing between the main window and the popout
+CrypticChat.setupMessagePassing = function() {
+    window.addEventListener('message', function(event) {
+        if (event.data.action === 'updateCrypticChat') {
+            CrypticChat.updateCrypticChatWindow(event.data.decryptedTexts);
+        }
+    });
+};
+
+// Call this function in CrypticChat.init()
+CrypticChat.init = function() {
+    // ... existing initialization code ...
+    CrypticChat.setupMessagePassing();
+    // ... rest of the initialization code ...
 };

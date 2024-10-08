@@ -221,7 +221,7 @@ function openOrUpdatePopupWithResults(results, originalMessage) {
     chrome.windows.create({
       url: chrome.runtime.getURL("html/popup.html"),
       type: "popup",
-      width: 400,
+      width: 600,
       height: 600
     }, (popupWindow) => {
       popupWindowId = popupWindow.id;
