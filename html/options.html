@@ -3,32 +3,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Codebook Options</title>
+    <title>Cryptic Chat Options</title>
     <link rel="stylesheet" href="../css/styles.css">
 </head>
 <body class="options-body">
     <div class="options-container">
-        <h1>Codebook Options</h1>
-        <p>Enter each phrase pair on a new line, separating the original phrase from the cryptic phrase with a colon (:).</p>
-        <div class="codebook-actions">
-            <button id="uploadBtn" class="icon-button"><img src="../icons/upload.png" alt="Upload" title="Upload Codebook"></button>
-            <button id="downloadBtn" class="icon-button"><img src="../icons/download.png" alt="Download" title="Download Codebook"></button>
-        </div>
-        <div id="dropZone" class="drop-zone">
-            <p>Drag and drop a file here</p>
-        </div>
-        <div class="url-input-container">
-            <input type="text" id="urlInput" placeholder="Enter URL ending with .txt">
-            <button id="updateFromUrlBtn">Update from URL</button>
-        </div>
-        <div class="auto-update-container">
-            <label for="autoUpdate">
+        <h1>Cryptic Chat Options</h1>
+        
+        <section>
+            <h2>Codebook</h2>
+            <div class="codebook-actions">
+                <button class="icon-button" id="downloadBtn" title="Download Codebook">
+                    <img src="../icons/download.png" alt="Download">
+                </button>
+                <button class="icon-button" id="uploadBtn" title="Upload Codebook">
+                    <img src="../icons/upload.png" alt="Upload">
+                </button>
+            </div>
+            <textarea id="codebookText" placeholder="Enter your codebook here..."></textarea>
+            
+            <div class="url-input-container">
+                <input type="text" id="urlInput" placeholder="Enter URL for remote codebook">
+                <button id="updateFromUrlBtn">Update</button>
+            </div>
+            <div class="auto-update-container">
                 <input type="checkbox" id="autoUpdate">
-                Auto-Update Codebook from URL (Only when using URL codebook)
-            </label>
-        </div>
-        <textarea id="codebook" placeholder="Enter codebook"></textarea>
-        <p id="errorMsg"></p>
+                <label for="autoUpdate">Auto-update from URL</label>
+            </div>
+            
+            <div class="drop-zone">
+                <p>Drag and drop a codebook file here</p>
+            </div>
+        </section>
+        
+        <section>
+            <h2>Chat Window Options</h2>
+            <div class="option-row">
+                <label for="messagesToLoad">Messages to load:</label>
+                <input type="number" id="messagesToLoad" min="1" max="100" value="50">
+            </div>
+            <div class="option-row">
+                <label for="autoScroll">Auto-scroll to bottom:</label>
+                <input type="checkbox" id="autoScroll" checked>
+            </div>
+            <div class="option-row">
+                <label for="windowTransparency">Window Transparency:</label>
+                <input type="number" id="windowTransparency" min="0" max="100" value="90">
+            </div>
+            <div class="option-row">
+                <label for="autoSend">Auto-Send in Discord:</label>
+                <input type="checkbox" id="autoSend" checked>
+            </div>
+        </section>
+        
+        <section>
+            <h2>Styling Options</h2>
+            <div class="option-row">
+                <label for="backgroundColor">Background color:</label>
+                <input type="color" id="backgroundColor" value="#141422">
+            </div>
+            <div class="option-row">
+                <label for="inputBoxColor">Input box color:</label>
+                <input type="color" id="inputBoxColor" value="#1e1e3f">
+            </div>
+            <div class="option-row">
+                <label for="headerColor">Header color:</label>
+                <input type="color" id="headerColor" value="#1a1a40">
+            </div>
+            <div id="userColorContainer"></div>
+            <button id="addUserColor">Add User Color</button>
+        </section>
+        
+        <section>
+            <h2>Muted Users / Blocklist</h2>
+            <div id="mutedUsersContainer"></div>
+            <div class="option-row">
+                <input type="text" id="newMutedUser" placeholder="Enter username to mute">
+                <button id="addMutedUser">Add Muted User</button>
+            </div>
+        </section>
+        
+        <div id="statusMsg"></div>
     </div>
     <input type="file" id="fileInput" style="display: none;">
     <script src="../js/options.js"></script>

@@ -1,39 +1,47 @@
-document.addEventListener("DOMContentLoaded", () => {
-  const codebookTextArea = document.getElementById("codebook");
+document.addEventListener('DOMContentLoaded', function() {
+  const codebookTextArea = document.getElementById("codebookText");
   const uploadBtn = document.getElementById("uploadBtn");
   const downloadBtn = document.getElementById("downloadBtn");
   const fileInput = document.getElementById("fileInput");
   const dropZone = document.getElementById("dropZone");
   const updateFromUrlBtn = document.getElementById("updateFromUrlBtn");
   const autoUpdateCheckbox = document.getElementById("autoUpdate");
-  const errorMsg = document.createElement("p");
-  errorMsg.id = "errorMsg";
-  errorMsg.style.color = "red";
-  errorMsg.style.fontSize = "12px";
-  document.querySelector(".options-container").appendChild(errorMsg);
+  const messagesToLoadInput = document.getElementById("messagesToLoad");
+  const autoScrollCheckbox = document.getElementById("autoScroll");
+  const backgroundColorInput = document.getElementById("backgroundColor");
+  const addUserColorBtn = document.getElementById("addUserColor");
+  const addMutedUserBtn = document.getElementById("addMutedUser");
+  const newMutedUserInput = document.getElementById("newMutedUser");
 
-  chrome.storage.local.get(["codebook", "codebookUrl", "autoUpdate"], (data) => {
-    displayCodebook(data.codebook || {});
-    document.getElementById("urlInput").value = data.codebookUrl || "";
-    autoUpdateCheckbox.checked = data.autoUpdate || false;
-  });
+  loadOptions();
 
-  codebookTextArea.addEventListener("input", debounce(autoSaveCodebook, 500));
-  uploadBtn.addEventListener("click", () => fileInput.click());
-  downloadBtn.addEventListener("click", downloadCodebook);
-  fileInput.addEventListener("change", (event) => processFile(event.target.files[0]));
-  updateFromUrlBtn.addEventListener("click", updateFromUrl);
-  autoUpdateCheckbox.addEventListener("change", () => {
-    chrome.storage.local.set({ autoUpdate: autoUpdateCheckbox.checked });
-  });
+  if (codebookTextArea) codebookTextArea.addEventListener("input", debounce(autoSaveCodebook, 500));
+  if (uploadBtn) uploadBtn.addEventListener("click", () => fileInput.click());
+  if (downloadBtn) downloadBtn.addEventListener("click", downloadCodebook);
+  if (fileInput) fileInput.addEventListener("change", (event) => processFile(event.target.files[0]));
+  if (updateFromUrlBtn) updateFromUrlBtn.addEventListener("click", updateFromUrl);
+  if (autoUpdateCheckbox) autoUpdateCheckbox.addEventListener("change", saveOptions);
+  if (messagesToLoadInput) messagesToLoadInput.addEventListener("input", saveOptions);
+  if (autoScrollCheckbox) autoScrollCheckbox.addEventListener("change", saveOptions);
+  if (backgroundColorInput) backgroundColorInput.addEventListener("input", saveOptions);
+  if (addUserColorBtn) addUserColorBtn.addEventListener("click", () => addUserColorRow());
 
-  dropZone.addEventListener("dragover", handleDragOver);
-  dropZone.addEventListener("dragleave", handleDragLeave);
-  dropZone.addEventListener("drop", handleDrop);
+  if (dropZone) {
+    dropZone.addEventListener("dragover", handleDragOver);
+    dropZone.addEventListener("dragleave", handleDragLeave);
+    dropZone.addEventListener("drop", handleDrop);
+  }
 
-  getCodebook().then((codebook) => {
-    displayCodebook(codebook);
-  });
+  if (addMutedUserBtn && newMutedUserInput) {
+    addMutedUserBtn.addEventListener('click', () => {
+      const newMutedUser = newMutedUserInput.value.trim();
+      if (newMutedUser) {
+        addMutedUserElement(newMutedUser);
+        newMutedUserInput.value = '';
+        saveOptions();
+      }
+    });
+  }
 });
 
 function debounce(func, delay) {
@@ -44,17 +52,8 @@ function debounce(func, delay) {
   };
 }
 
-function displayCodebook(codebook) {
-  const codebookTextArea = document.getElementById("codebook");
-  let formattedCodebook = "";
-  for (const [key, value] of Object.entries(codebook)) {
-    formattedCodebook += `${key} : ${value}\n`;
-  }
-  codebookTextArea.value = formattedCodebook.trim();
-}
-
 function autoSaveCodebook() {
-  const codebookTextArea = document.getElementById("codebook");
+  const codebookTextArea = document.getElementById("codebookText");
   const lines = codebookTextArea.value.split('\n');
   const updatedCodebook = {};
   let errorLines = [];
@@ -72,31 +71,137 @@ function autoSaveCodebook() {
   }
 
   if (errorLines.length > 0) {
-    showError(`Invalid format on line(s): ${errorLines.join(", ")}`);
-    return;
+    showStatus(`Error on line(s): ${errorLines.join(', ')}. Format should be "key : value"`, true);
+  } else {
+    chrome.storage.local.set({ codebook: updatedCodebook }, () => {
+      if (chrome.runtime.lastError) {
+        showStatus('Error saving codebook: ' + chrome.runtime.lastError.message, true);
+      } else {
+        showStatus('Codebook saved successfully!');
+        chrome.runtime.sendMessage({ action: 'codebookUpdated' });
+      }
+    });
   }
+}
 
-  saveCodebook(updatedCodebook);
+function saveOptions() {
+  const options = {
+    messagesToLoad: parseInt(document.getElementById('messagesToLoad').value),
+    autoScroll: document.getElementById('autoScroll').checked,
+    backgroundColor: document.getElementById('backgroundColor').value,
+    inputBoxColor: document.getElementById('inputBoxColor').value,
+    headerColor: document.getElementById('headerColor').value,
+    windowTransparency: parseInt(document.getElementById('windowTransparency').value),
+    userColors: getUserColors(),
+    url: document.getElementById('urlInput').value,
+    autoUpdate: document.getElementById('autoUpdate').checked,
+    autoSend: document.getElementById('autoSend').checked,
+    mutedUsers: getMutedUsers()
+  };
+
+  chrome.storage.local.set(options, () => {
+    if (chrome.runtime.lastError) {
+      showStatus('Error saving options: ' + chrome.runtime.lastError.message, true);
+    } else {
+      showStatus('Options saved successfully!');
+    }
+  });
+}
+
+function loadOptions() {
+  chrome.storage.local.get([
+    'codebook',
+    'messagesToLoad',
+    'autoScroll',
+    'backgroundColor',
+    'inputBoxColor',
+    'headerColor',
+    'windowTransparency',
+    'userColors',
+    'url',
+    'autoUpdate',
+    'autoSend',
+    'mutedUsers'
+  ], function(items) {
+    document.getElementById('codebookText').value = formatCodebook(items.codebook || {});
+    document.getElementById('messagesToLoad').value = items.messagesToLoad || 50;
+    document.getElementById('autoScroll').checked = items.autoScroll !== false;
+    document.getElementById('backgroundColor').value = items.backgroundColor || '#141422';
+    document.getElementById('inputBoxColor').value = items.inputBoxColor || '#1e1e3f';
+    document.getElementById('headerColor').value = items.headerColor || '#1a1a40';
+    document.getElementById('windowTransparency').value = items.windowTransparency || 90;
+    document.getElementById('urlInput').value = items.url || '';
+    document.getElementById('autoUpdate').checked = items.autoUpdate || false;
+    document.getElementById('autoSend').checked = items.autoSend !== false;
+    loadUserColors(items.userColors || []);
+    loadMutedUsers(items.mutedUsers || []);
+  });
+}
+
+function formatCodebook(codebook) {
+  return Object.entries(codebook).map(([key, value]) => `${key} : ${value}`).join('\n');
+}
+
+function getUserColors() {
+  const userColorRows = document.querySelectorAll('.user-color-row');
+  return Array.from(userColorRows).map(row => ({
+    username: row.querySelector('.username').value,
+    color: row.querySelector('.userColor').value
+  })).filter(uc => uc.username);
+}
+
+function loadUserColors(userColors) {
+  const container = document.getElementById('userColorContainer');
+  container.innerHTML = '';
+  userColors.forEach(uc => addUserColorRow(uc.username, uc.color));
+}
+
+function addUserColorRow(username = '', color = '#ffffff') {
+  const container = document.getElementById('userColorContainer');
+  const row = document.createElement('div');
+  row.className = 'option-row user-color-row';
+  row.innerHTML = `
+    <input type="text" class="username" placeholder="Username" value="${username}">
+    <input type="color" class="userColor" value="${color}">
+    <button class="removeUserColor">Remove</button>
+  `;
+  container.appendChild(row);
+  row.querySelector('.username').addEventListener('input', saveOptions);
+  row.querySelector('.userColor').addEventListener('input', saveOptions);
+  row.querySelector('.removeUserColor').addEventListener('click', () => {
+    container.removeChild(row);
+    saveOptions();
+  });
+}
+
+function showStatus(message, isError = false) {
+  const statusMsg = document.getElementById("statusMsg");
+  statusMsg.textContent = message;
+  statusMsg.className = isError ? "error" : "success";
+  setTimeout(() => {
+    statusMsg.textContent = "";
+    statusMsg.className = "";
+  }, 3000);
 }
 
 function processFile(file) {
   if (!file) return;
   
   if (file.type !== "text/plain") {
-    showError("Please upload a .txt file.");
+    showStatus("Please upload a .txt file.", true);
     return;
   }
 
   const reader = new FileReader();
   reader.onload = function(e) {
-    document.getElementById("codebook").value = e.target.result;
+    document.getElementById("codebookText").value = e.target.result;
     autoSaveCodebook();
   };
   reader.readAsText(file);
 }
 
 function downloadCodebook() {
-  const codebookTextArea = document.getElementById("codebook");
+  const codebookTextArea = document.getElementById("codebookText");
   const content = codebookTextArea.value;
   const blob = new Blob([content], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);
@@ -132,21 +237,12 @@ function handleDrop(event) {
   processFile(file);
 }
 
-function showError(message, isError = true) {
-  const errorMsg = document.getElementById("errorMsg");
-  errorMsg.textContent = message;
-  errorMsg.style.color = isError ? "red" : "green";
-  setTimeout(() => {
-    errorMsg.textContent = "";
-  }, 3000);
-}
-
 function updateFromUrl() {
   const urlInput = document.getElementById("urlInput");
   let url = urlInput.value.trim();
 
   if (!isValidUrl(url)) {
-    showError("Please enter a valid HTTPS URL ending with .txt");
+    showStatus("Please enter a valid HTTPS URL ending with .txt", true);
     return;
   }
 
@@ -162,13 +258,13 @@ function updateFromUrl() {
       return response.text();
     })
     .then(text => {
-      document.getElementById("codebook").value = text;
+      document.getElementById("codebookText").value = text;
       autoSaveCodebook();
-      chrome.storage.local.set({ codebookUrl: url });
-      showError("Codebook updated successfully from URL!", false);
+      chrome.storage.local.set({ url: url });
+      showStatus("Codebook updated successfully from URL!", false);
     })
     .catch(error => {
-      showError("Error fetching codebook: " + error.message);
+      showStatus("Error fetching codebook: " + error.message, true);
     });
 }
 
@@ -177,62 +273,29 @@ function isValidUrl(url) {
          (url.startsWith('https://github.com/') && url.includes('/blob/') && url.endsWith('.txt'));
 }
 
-function saveCodebook(codebook) {
-  chrome.storage.local.set({ codebook: codebook }, function() {
-    if (chrome.runtime.lastError) {
-      showError('Error saving codebook: ' + chrome.runtime.lastError.message);
-    } else {
-      showError('Codebook updated successfully!', false);
-      chrome.runtime.sendMessage({ action: 'codebookUpdated' });
-    }
-  });
+function getMutedUsers() {
+  const mutedUserElements = document.querySelectorAll('.muted-user');
+  return Array.from(mutedUserElements).map(el => el.dataset.username);
 }
 
-function getCodebook() {
-  return new Promise((resolve, reject) => {
-    chrome.storage.local.get('codebook', function(result) {
-      if (chrome.runtime.lastError) {
-        reject(chrome.runtime.lastError);
-      } else {
-        resolve(result.codebook || {});
-      }
-    });
-  });
+function loadMutedUsers(mutedUsers) {
+  const container = document.getElementById('mutedUsersContainer');
+  container.innerHTML = '';
+  mutedUsers.forEach(username => addMutedUserElement(username));
 }
 
-function uploadCodebook(event) {
-  const file = event.target.files[0];
-  if (file) {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      const content = e.target.result;
-      const codebookTextarea = document.getElementById('codebook');
-      codebookTextarea.value = content;
-      saveCodebook(parseCodebook(content));
-    };
-    reader.readAsText(file);
-  }
-}
-
-function parseCodebook(content) {
-  const lines = content.split('\n');
-  const codebook = {};
-  lines.forEach(line => {
-    const [key, value] = line.split(':').map(item => item.trim());
-    if (key && value) {
-      codebook[key] = value;
-    }
-  });
-  return codebook;
-}
-
-function saveCodebook(codebook) {
-  chrome.storage.local.set({ codebook: codebook }, function() {
-    if (chrome.runtime.lastError) {
-      showError('Error saving codebook: ' + chrome.runtime.lastError.message);
-    } else {
-      showError('Codebook saved successfully!', false);
-      chrome.runtime.sendMessage({ action: 'codebookUpdated' });
-    }
+function addMutedUserElement(username) {
+  const container = document.getElementById('mutedUsersContainer');
+  const element = document.createElement('div');
+  element.className = 'muted-user option-row';
+  element.dataset.username = username;
+  element.innerHTML = `
+    <span>${username}</span>
+    <button class="removeMutedUser">Remove</button>
+  `;
+  container.appendChild(element);
+  element.querySelector('.removeMutedUser').addEventListener('click', () => {
+    container.removeChild(element);
+    saveOptions();
   });
 }

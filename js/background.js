@@ -115,21 +115,40 @@ function isValidMessage(request) {
 function processMessage(request, sendResponse) {
   let processedMessage = request.message;
   
-  if (request.action === "encrypt") {
-    for (const key in codebook) {
-      if (codebook.hasOwnProperty(key)) {
-        processedMessage = processedMessage.replace(new RegExp(escapeRegExp(key), 'g'), codebook[key]);
-      }
+  chrome.storage.local.get(['codebook', 'mutedUsers'], function(result) {
+    const codebook = result.codebook || {};
+    const mutedUsers = result.mutedUsers || [];
+    
+    // Check if the message is from a muted user
+    const username = extractUsername(processedMessage);
+    if (mutedUsers.includes(username)) {
+      sendResponse({ error: 'Message from muted user' });
+      return;
     }
-    sendResponse({ encryptedMessage: processedMessage });
-  } else {
-    for (const key in codebook) {
-      if (codebook.hasOwnProperty(key)) {
-        processedMessage = processedMessage.replace(new RegExp(escapeRegExp(codebook[key]), 'g'), key);
+
+    if (request.action === "encrypt") {
+      for (const key in codebook) {
+        if (codebook.hasOwnProperty(key)) {
+          processedMessage = processedMessage.replace(new RegExp(escapeRegExp(key), 'g'), codebook[key]);
+        }
       }
+      sendResponse({ encryptedMessage: processedMessage });
+    } else {
+      for (const key in codebook) {
+        if (codebook.hasOwnProperty(key)) {
+          processedMessage = processedMessage.replace(new RegExp(escapeRegExp(codebook[key]), 'g'), key);
+        }
+      }
+      sendResponse({ decryptedMessage: processedMessage });
     }
-    sendResponse({ decryptedMessage: processedMessage });
-  }
+  });
+}
+
+function extractUsername(message) {
+  // This function should extract the username from the message
+  // You may need to adjust this based on your message format
+  const match = message.match(/^([^:]+):/);
+  return match ? match[1].trim() : '';
 }
 
 function escapeRegExp(string) {

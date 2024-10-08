@@ -2,19 +2,31 @@ window.CrypticChat = window.CrypticChat || {};
 
 CrypticChat.Discord = {
     discordParse: function(codebook) {
-        let decryptedTexts = [];
-        const chatArea = document.querySelector('[class^="chatContent_"]');
-        if (!chatArea) return decryptedTexts;
+        return new Promise((resolve, reject) => {
+            chrome.storage.local.get('mutedUsers', (result) => {
+                const mutedUsers = result.mutedUsers || [];
+                let decryptedTexts = [];
+                const chatArea = document.querySelector('[class^="chatContent_"]');
+                if (!chatArea) {
+                    resolve(decryptedTexts);
+                    return;
+                }
 
-        const messageElements = chatArea.querySelectorAll('[id^="chat-messages-"]');
-        for (let i = messageElements.length - 1; i >= 0; i--) {
-            const decryptedText = this.decryptElement(messageElements[i], codebook);
-            if (decryptedText) {
-                decryptedTexts.unshift(decryptedText);
-                if (decryptedTexts.length >= 50) break;
-            }
-        }
-        return decryptedTexts;
+                const messageElements = chatArea.querySelectorAll('[id^="chat-messages-"]');
+                for (let i = messageElements.length - 1; i >= 0; i--) {
+                    const decryptedText = this.decryptElement(messageElements[i], codebook);
+                    if (decryptedText) {
+                        const username = decryptedText.split(':')[0].trim();
+                        if (!mutedUsers.includes(username)) {
+                            decryptedTexts.unshift(decryptedText);
+                            if (decryptedTexts.length >= 50) break;
+                        }
+                    }
+                }
+
+                resolve(decryptedTexts);
+            });
+        });
     },
 
     decryptElement: function(messageElement, codebook) {
