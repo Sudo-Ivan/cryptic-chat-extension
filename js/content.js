@@ -478,17 +478,18 @@ CrypticChat.encryptAndSend = function(message) {
         'autoSend', 
         'destructableMessages', 
         'destructKeyword', 
-        'defaultDestructTime'
+        'defaultDestructTime',
+        'caseInsensitiveEncryption'
     ], function(result) {
         const codebook = result.codebook || {};
         const autoSend = result.autoSend !== false;
         const destructableMessages = result.destructableMessages || false;
         const destructKeyword = result.destructKeyword || '\\d ! d';
         const defaultDestructTime = result.defaultDestructTime || 5;
+        const caseInsensitiveEncryption = result.caseInsensitiveEncryption || false;
         let encryptedMessage = message;
 
         if (destructableMessages && message.includes(destructKeyword)) {
-            // Replace the destruction keyword with the full format
             const destructMatch = message.match(new RegExp(`${CrypticChat.escapeRegExp(destructKeyword)}(\\d+)?`));
             if (destructMatch) {
                 const minutes = destructMatch[1] || defaultDestructTime;
@@ -498,7 +499,17 @@ CrypticChat.encryptAndSend = function(message) {
 
         for (const key in codebook) {
             if (codebook.hasOwnProperty(key)) {
-                encryptedMessage = encryptedMessage.replace(new RegExp(CrypticChat.escapeRegExp(key), 'g'), codebook[key]);
+                const regex = caseInsensitiveEncryption 
+                    ? new RegExp(`\\b${CrypticChat.escapeRegExp(key)}\\b`, 'gi')
+                    : new RegExp(`\\b${CrypticChat.escapeRegExp(key)}\\b`, 'g');
+                encryptedMessage = encryptedMessage.replace(regex, (match) => {
+                    const replacement = codebook[key];
+                    return caseInsensitiveEncryption ? replacement : (
+                        match === match.toUpperCase() ? replacement.toUpperCase() :
+                        match === match.toLowerCase() ? replacement.toLowerCase() :
+                        replacement
+                    );
+                });
             }
         }
 
