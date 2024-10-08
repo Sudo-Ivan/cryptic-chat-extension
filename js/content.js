@@ -360,7 +360,9 @@ CrypticChat.updateCrypticChatWindow = function(decryptedTexts) {
                 
                 // Set a timeout to remove the message
                 const timeoutId = setTimeout(() => {
-                    messagesContainer.removeChild(messageElement);
+                    if (messagesContainer.contains(messageElement)) {
+                        messagesContainer.removeChild(messageElement);
+                    }
                 }, destructMinutes * 60 * 1000);
 
                 // Store the timeout ID and destruction time
@@ -377,6 +379,9 @@ CrypticChat.updateCrypticChatWindow = function(decryptedTexts) {
                     messageElement.appendChild(timerElement);
 
                     const updateTimer = () => {
+                        if (!messagesContainer.contains(messageElement)) {
+                            return; // Stop updating if the element is no longer in the container
+                        }
                         const remainingTime = Math.max(0, (messageElement.dataset.destructTime - new Date().getTime()) / 1000);
                         const minutes = Math.floor(remainingTime / 60);
                         const seconds = Math.floor(remainingTime % 60);
@@ -479,7 +484,8 @@ CrypticChat.encryptAndSend = function(message) {
         'destructableMessages', 
         'destructKeyword', 
         'defaultDestructTime',
-        'caseInsensitiveEncryption'
+        'caseInsensitiveEncryption',
+        'crypticPhrase'
     ], function(result) {
         const codebook = result.codebook || {};
         const autoSend = result.autoSend !== false;
@@ -487,13 +493,17 @@ CrypticChat.encryptAndSend = function(message) {
         const destructKeyword = result.destructKeyword || '\\d ! d';
         const defaultDestructTime = result.defaultDestructTime || 5;
         const caseInsensitiveEncryption = result.caseInsensitiveEncryption || false;
+        const crypticPhrase = result.crypticPhrase || '\\d ! d';
         let encryptedMessage = message;
 
-        if (destructableMessages && message.includes(destructKeyword)) {
-            const destructMatch = message.match(new RegExp(`${CrypticChat.escapeRegExp(destructKeyword)}(\\d+)?`));
+        if (destructableMessages) {
+            const destructRegex = caseInsensitiveEncryption 
+                ? new RegExp(CrypticChat.escapeRegExp(destructKeyword), 'gi')
+                : new RegExp(CrypticChat.escapeRegExp(destructKeyword), 'g');
+            const destructMatch = message.match(destructRegex);
             if (destructMatch) {
                 const minutes = destructMatch[1] || defaultDestructTime;
-                encryptedMessage = encryptedMessage.replace(destructMatch[0], `\\d ! d${minutes}//`);
+                encryptedMessage = encryptedMessage.replace(destructMatch[0], `${crypticPhrase}${minutes}//`);
             }
         }
 
