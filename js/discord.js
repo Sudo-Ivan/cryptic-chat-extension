@@ -49,6 +49,23 @@ CrypticChat.Discord = {
             }
 
             if (isDecrypted) {
+                // Check for destructible message
+                const destructMatch = decryptedText.match(/\\d ! d(\d+)\/\//);
+                if (destructMatch) {
+                    const destructMinutes = parseInt(destructMatch[1]);
+                    const timestamp = messageElement.querySelector('time').dateTime;
+                    const messageTime = new Date(timestamp).getTime();
+                    const currentTime = new Date().getTime();
+                    const timeDiff = (currentTime - messageTime) / (1000 * 60); // difference in minutes
+
+                    if (timeDiff >= destructMinutes) {
+                        return null; // Message should be destroyed
+                    }
+
+                    // Remove the destruction keyword from the message
+                    decryptedText = decryptedText.replace(destructMatch[0], '').trim();
+                }
+
                 let username = 'Unknown User';
                 let timestamp = '';
 

@@ -28,6 +28,9 @@ CrypticChat.createCrypticChatWindow = function() {
             overflow: hidden;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             transition: height 0.3s ease-in-out;
+            font-size: 14px;
+            line-height: 1.5;
+            user-select: text;
         }
         .cryptic-chat-header {
             cursor: move;
@@ -50,6 +53,7 @@ CrypticChat.createCrypticChatWindow = function() {
             background-color: #141422;
             scrollbar-width: thin;
             scrollbar-color: #30305a #141422;
+            --message-spacing: 5px;
         }
         .cryptic-chat-input {
             width: calc(100% - 20px);
@@ -136,6 +140,23 @@ CrypticChat.createCrypticChatWindow = function() {
             border-radius: 5px;
             margin-top: 5px;
         }
+        .cryptic-chat-message {
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+        .cryptic-chat-message:hover {
+            background-color: rgba(30, 30, 63, 0.9);
+        }
+        .cryptic-chat-username {
+            font-weight: bold;
+            margin-right: 8px;
+        }
+        .cryptic-chat-timestamp {
+            font-size: 0.8em;
+            color: #a0a0a0;
+        }
     `;
 
     const styleElement = document.createElement('style');
@@ -215,7 +236,7 @@ CrypticChat.makeDraggable = function(element, handle) {
     }
 };
 
-CrypticChat.applyOptions = function() {
+CrypticChat.applyOptions = function(isInitialLoad = false) {
     chrome.storage.local.get([
         'messagesToLoad',
         'autoScroll',
@@ -223,7 +244,14 @@ CrypticChat.applyOptions = function() {
         'userColors',
         'inputBoxColor',
         'headerColor',
-        'windowTransparency'
+        'windowTransparency',
+        'destructableMessages',
+        'destructKeyword',
+        'defaultDestructTime',
+        'showDestructTimer',
+        'messageSpacing',
+        'messageBubbleColor',
+        'messageBubbleOpacity'
     ], function(items) {
         CrypticChat.messagesToLoad = items.messagesToLoad || 50;
         CrypticChat.autoScroll = items.autoScroll !== false;
@@ -232,19 +260,46 @@ CrypticChat.applyOptions = function() {
         CrypticChat.inputBoxColor = items.inputBoxColor || '#1e1e3f';
         CrypticChat.headerColor = items.headerColor || '#1a1a40';
         CrypticChat.windowTransparency = items.windowTransparency || 90;
-        
+        CrypticChat.destructableMessages = items.destructableMessages || false;
+        CrypticChat.destructKeyword = items.destructKeyword || '\\d ! d';
+        CrypticChat.defaultDestructTime = items.defaultDestructTime || 5;
+        CrypticChat.showDestructTimer = items.showDestructTimer !== false;
+        CrypticChat.messageSpacing = items.messageSpacing || 5;
+        CrypticChat.messageBubbleColor = items.messageBubbleColor || '#1e1e3f';
+        CrypticChat.messageBubbleOpacity = items.messageBubbleOpacity || 70;
+
         const crypticChatWindow = document.getElementById('crypticChatWindow');
         if (crypticChatWindow) {
-            const content = crypticChatWindow.querySelector('.cryptic-chat-content');
-            const input = crypticChatWindow.querySelector('.cryptic-chat-input');
-            const header = crypticChatWindow.querySelector('.cryptic-chat-header');
-
-            content.style.backgroundColor = CrypticChat.backgroundColor;
-            input.style.backgroundColor = CrypticChat.inputBoxColor;
-            header.style.backgroundColor = CrypticChat.headerColor;
             crypticChatWindow.style.backgroundColor = `rgba(15, 15, 35, ${CrypticChat.windowTransparency / 100})`;
         }
+
+        CrypticChat.applyMessageSpacing();
+        CrypticChat.applyMessageBubbleStyle();
+
+        if (isInitialLoad) {
+            CrypticChat.updateAllStyles();
+        }
     });
+};
+
+CrypticChat.applyMessageSpacing = function() {
+    const messagesContainer = document.querySelector('.cryptic-chat-content');
+    if (messagesContainer) {
+        messagesContainer.style.setProperty('--message-spacing', `${CrypticChat.messageSpacing}px`);
+    }
+};
+
+CrypticChat.applyMessageBubbleStyle = function() {
+    const crypticChatWindow = document.getElementById('crypticChatWindow');
+    if (crypticChatWindow) {
+        const style = crypticChatWindow.querySelector('style') || document.createElement('style');
+        style.textContent = `
+            .cryptic-chat-message {
+                background-color: ${CrypticChat.messageBubbleColor}${Math.round(CrypticChat.messageBubbleOpacity * 2.55).toString(16).padStart(2, '0')};
+            }
+        `;
+        crypticChatWindow.appendChild(style);
+    }
 };
 
 CrypticChat.updateCrypticChatWindow = function(decryptedTexts) {
@@ -260,25 +315,82 @@ CrypticChat.updateCrypticChatWindow = function(decryptedTexts) {
     const existingMessages = new Set(
         Array.from(messagesContainer.children).map(child => child.textContent)
     );
-    
+
     let newMessagesAdded = false;
-    
+
     // Clear existing messages that are not in the new decrypted texts
     Array.from(messagesContainer.children).forEach(child => {
         if (!decryptedTexts.includes(child.textContent)) {
             messagesContainer.removeChild(child);
         }
     });
-    
-    decryptedTexts.slice(-CrypticChat.messagesToLoad).forEach(text => {
+
+    decryptedTexts.forEach(text => {
         if (!existingMessages.has(text)) {
             existingMessages.add(text);
             const messageElement = document.createElement('div');
-            messageElement.textContent = text;
-            messageElement.style.marginBottom = '10px';
+            messageElement.className = 'cryptic-chat-message';
+            
+            const [username, ...messageParts] = text.split(':');
+            const message = messageParts.join(':').trim();
+            const timestamp = message.match(/- (\d{2}:\d{2})/);
+
+            const usernameSpan = document.createElement('span');
+            usernameSpan.className = 'cryptic-chat-username';
+            usernameSpan.textContent = username;
+
+            const messageSpan = document.createElement('span');
+            messageSpan.className = 'cryptic-chat-text';
+            messageSpan.textContent = message.replace(/- \d{2}:\d{2}$/, '').trim();
+
+            const timestampSpan = document.createElement('span');
+            timestampSpan.className = 'cryptic-chat-timestamp';
+            timestampSpan.textContent = timestamp ? timestamp[1] : '';
+
+            messageElement.appendChild(usernameSpan);
+            messageElement.appendChild(messageSpan);
+            messageElement.appendChild(timestampSpan);
+
+            // Check if it's a destructible message
+            const destructMatch = text.match(/\\d ! d(\d+)\/\//);
+            if (destructMatch) {
+                const destructMinutes = parseInt(destructMatch[1]);
+                const messageTime = new Date().getTime();
+                
+                // Set a timeout to remove the message
+                const timeoutId = setTimeout(() => {
+                    messagesContainer.removeChild(messageElement);
+                }, destructMinutes * 60 * 1000);
+
+                // Store the timeout ID and destruction time
+                messageElement.dataset.timeoutId = timeoutId;
+                messageElement.dataset.destructTime = messageTime + (destructMinutes * 60 * 1000);
+
+                // Remove the destruction keyword from the displayed message
+                messageElement.textContent = text.replace(destructMatch[0], '').trim();
+
+                // Add timer if enabled
+                if (CrypticChat.showDestructTimer) {
+                    const timerElement = document.createElement('span');
+                    timerElement.className = 'destruct-timer';
+                    messageElement.appendChild(timerElement);
+
+                    const updateTimer = () => {
+                        const remainingTime = Math.max(0, (messageElement.dataset.destructTime - new Date().getTime()) / 1000);
+                        const minutes = Math.floor(remainingTime / 60);
+                        const seconds = Math.floor(remainingTime % 60);
+                        timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+                        if (remainingTime > 0) {
+                            requestAnimationFrame(updateTimer);
+                        }
+                    };
+
+                    updateTimer();
+                }
+            }
             
             // Apply user color if matched
-            const username = text.split(':')[0].trim();
             const userColor = CrypticChat.userColors.find(uc => uc.username === username);
             if (userColor) {
                 messageElement.style.color = userColor.color;
@@ -300,6 +412,8 @@ CrypticChat.updateCrypticChatWindow = function(decryptedTexts) {
             newMessagesAdded = true;
         }
     });
+
+    CrypticChat.applyMessageSpacing();
 
     if (newMessagesAdded && CrypticChat.autoScroll) {
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -358,10 +472,28 @@ CrypticChat.setupInputHandler = function(inputArea) {
 };
 
 CrypticChat.encryptAndSend = function(message) {
-    chrome.storage.local.get(['codebook', 'autoSend'], function(result) {
+    chrome.storage.local.get([
+        'codebook', 
+        'autoSend', 
+        'destructableMessages', 
+        'destructKeyword', 
+        'defaultDestructTime'
+    ], function(result) {
         const codebook = result.codebook || {};
         const autoSend = result.autoSend !== false;
+        const destructableMessages = result.destructableMessages || false;
+        const destructKeyword = result.destructKeyword || '\\d ! d';
+        const defaultDestructTime = result.defaultDestructTime || 5;
         let encryptedMessage = message;
+
+        if (destructableMessages && message.includes(destructKeyword)) {
+            // Replace the destruction keyword with the full format
+            const destructMatch = message.match(new RegExp(`${CrypticChat.escapeRegExp(destructKeyword)}(\\d+)?`));
+            if (destructMatch) {
+                const minutes = destructMatch[1] || defaultDestructTime;
+                encryptedMessage = encryptedMessage.replace(destructMatch[0], `\\d ! d${minutes}//`);
+            }
+        }
 
         for (const key in codebook) {
             if (codebook.hasOwnProperty(key)) {
@@ -374,9 +506,42 @@ CrypticChat.encryptAndSend = function(message) {
 };
 
 CrypticChat.init = function() {
-    CrypticChat.applyOptions();
-    chrome.storage.local.get('codebook', function(result) {
-        CrypticChat.codebook = result.codebook || {};
+    chrome.storage.local.get([
+        'messagesToLoad',
+        'autoScroll',
+        'backgroundColor',
+        'inputBoxColor',
+        'headerColor',
+        'windowTransparency',
+        'destructableMessages',
+        'destructKeyword',
+        'crypticPhrase',
+        'defaultDestructTime',
+        'showDestructTimer',
+        'messageSpacing',
+        'messageBubbleColor',
+        'messageBubbleOpacity',
+        'userColors',
+        'codebook'
+    ], function(items) {
+        CrypticChat.messagesToLoad = items.messagesToLoad || 50;
+        CrypticChat.autoScroll = items.autoScroll !== false;
+        CrypticChat.backgroundColor = items.backgroundColor || '#141422';
+        CrypticChat.inputBoxColor = items.inputBoxColor || '#1e1e3f';
+        CrypticChat.headerColor = items.headerColor || '#1a1a40';
+        CrypticChat.windowTransparency = items.windowTransparency || 90;
+        CrypticChat.destructableMessages = items.destructableMessages || false;
+        CrypticChat.destructKeyword = items.destructKeyword || '\\d ! d';
+        CrypticChat.crypticPhrase = items.crypticPhrase || '\\d ! d';
+        CrypticChat.defaultDestructTime = items.defaultDestructTime || 5;
+        CrypticChat.showDestructTimer = items.showDestructTimer !== false;
+        CrypticChat.messageSpacing = items.messageSpacing || 5;
+        CrypticChat.messageBubbleColor = items.messageBubbleColor || '#1e1e3f';
+        CrypticChat.messageBubbleOpacity = items.messageBubbleOpacity || 70;
+        CrypticChat.userColors = items.userColors || [];
+        CrypticChat.codebook = items.codebook || {};
+
+        CrypticChat.updateAllStyles();
         CrypticChat.reloadMessages();
     });
 
@@ -425,6 +590,9 @@ if (appMount) {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'reloadMessages') {
         CrypticChat.reloadMessages();
+    } else if (request.action === 'updateStyles') {
+        CrypticChat.applyOptions();
+        CrypticChat.updateAllStyles();
     }
 });
 
@@ -432,5 +600,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 chrome.storage.onChanged.addListener(function(changes, namespace) {
     if (namespace === 'local') {
         CrypticChat.applyOptions();
+        CrypticChat.updateAllStyles();
     }
 });
+
+CrypticChat.updateAllStyles = function() {
+    const crypticChatWindow = document.getElementById('crypticChatWindow');
+    if (crypticChatWindow) {
+        const header = crypticChatWindow.querySelector('.cryptic-chat-header');
+        const input = crypticChatWindow.querySelector('.cryptic-chat-input');
+        const content = crypticChatWindow.querySelector('.cryptic-chat-content');
+
+        crypticChatWindow.style.backgroundColor = `rgba(15, 15, 35, ${CrypticChat.windowTransparency / 100})`;
+        if (header) header.style.backgroundColor = CrypticChat.headerColor;
+        if (input) input.style.backgroundColor = CrypticChat.inputBoxColor;
+        if (content) content.style.backgroundColor = CrypticChat.backgroundColor;
+
+        CrypticChat.applyMessageSpacing();
+        CrypticChat.applyMessageBubbleStyle();
+    }
+};

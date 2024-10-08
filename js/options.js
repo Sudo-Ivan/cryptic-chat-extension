@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const uploadBtn = document.getElementById("uploadBtn");
   const downloadBtn = document.getElementById("downloadBtn");
   const fileInput = document.getElementById("fileInput");
-  const dropZone = document.getElementById("dropZone");
+  const dropZone = document.querySelector('.drop-zone');
   const updateFromUrlBtn = document.getElementById("updateFromUrlBtn");
   const autoUpdateCheckbox = document.getElementById("autoUpdate");
   const messagesToLoadInput = document.getElementById("messagesToLoad");
@@ -12,13 +12,14 @@ document.addEventListener('DOMContentLoaded', function() {
   const addUserColorBtn = document.getElementById("addUserColor");
   const addMutedUserBtn = document.getElementById("addMutedUser");
   const newMutedUserInput = document.getElementById("newMutedUser");
+  const resetThemeBtn = document.getElementById("resetTheme");
 
   loadOptions();
 
   if (codebookTextArea) codebookTextArea.addEventListener("input", debounce(autoSaveCodebook, 500));
   if (uploadBtn) uploadBtn.addEventListener("click", () => fileInput.click());
   if (downloadBtn) downloadBtn.addEventListener("click", downloadCodebook);
-  if (fileInput) fileInput.addEventListener("change", (event) => processFile(event.target.files[0]));
+  if (fileInput) fileInput.addEventListener("change", (event) => handleFileUpload(event.target.files[0]));
   if (updateFromUrlBtn) updateFromUrlBtn.addEventListener("click", updateFromUrl);
   if (autoUpdateCheckbox) autoUpdateCheckbox.addEventListener("change", saveOptions);
   if (messagesToLoadInput) messagesToLoadInput.addEventListener("input", saveOptions);
@@ -42,6 +43,27 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
   }
+
+  if (resetThemeBtn) {
+    resetThemeBtn.addEventListener('click', () => {
+      resetTheme();
+      autoSave();
+    });
+  }
+
+  document.getElementById('exportCodebook').addEventListener('click', exportCodebook);
+  document.getElementById('saveBtn').addEventListener('click', () => saveOptions(true));
+
+  // Add event listeners for auto-save
+  ['messageBubbleColor', 'messageBubbleOpacity', 'destructableMessages', 'destructKeyword', 'crypticPhrase', 'defaultDestructTime', 'showDestructTimer'].forEach(id => {
+    document.getElementById(id).addEventListener('change', debounce(autoSave, 500));
+  });
+
+  // Add event listeners for auto-save
+  ['messagesToLoad', 'autoScroll', 'backgroundColor', 'inputBoxColor', 'headerColor', 'windowTransparency', 'autoSend', 'messageSpacing', 'messageBubbleColor', 'messageBubbleOpacity'].forEach(id => {
+    document.getElementById(id).addEventListener('change', debounce(autoSave, 500));
+    document.getElementById(id).addEventListener('input', debounce(autoSave, 500));
+  });
 });
 
 function debounce(func, delay) {
@@ -84,28 +106,32 @@ function autoSaveCodebook() {
   }
 }
 
-function saveOptions() {
-  const options = {
-    messagesToLoad: parseInt(document.getElementById('messagesToLoad').value),
-    autoScroll: document.getElementById('autoScroll').checked,
-    backgroundColor: document.getElementById('backgroundColor').value,
-    inputBoxColor: document.getElementById('inputBoxColor').value,
-    headerColor: document.getElementById('headerColor').value,
-    windowTransparency: parseInt(document.getElementById('windowTransparency').value),
-    userColors: getUserColors(),
-    url: document.getElementById('urlInput').value,
-    autoUpdate: document.getElementById('autoUpdate').checked,
-    autoSend: document.getElementById('autoSend').checked,
-    mutedUsers: getMutedUsers()
-  };
+function saveOptions(showMessage = true) {
+    const options = {
+        messagesToLoad: document.getElementById('messagesToLoad').value,
+        autoScroll: document.getElementById('autoScroll').checked,
+        backgroundColor: document.getElementById('backgroundColor').value,
+        inputBoxColor: document.getElementById('inputBoxColor').value,
+        headerColor: document.getElementById('headerColor').value,
+        windowTransparency: document.getElementById('windowTransparency').value,
+        destructableMessages: document.getElementById('destructableMessages').checked,
+        destructKeyword: document.getElementById('destructKeyword').value,
+        crypticPhrase: document.getElementById('crypticPhrase').value,
+        defaultDestructTime: document.getElementById('defaultDestructTime').value,
+        showDestructTimer: document.getElementById('showDestructTimer').checked,
+        messageSpacing: document.getElementById('messageSpacing').value,
+        messageBubbleColor: document.getElementById('messageBubbleColor').value,
+        messageBubbleOpacity: document.getElementById('messageBubbleOpacity').value,
+        userColors: getUserColors(),
+        mutedUsers: getMutedUsers(),
+        autoSend: document.getElementById('autoSend').checked
+    };
 
-  chrome.storage.local.set(options, () => {
-    if (chrome.runtime.lastError) {
-      showStatus('Error saving options: ' + chrome.runtime.lastError.message, true);
-    } else {
-      showStatus('Options saved successfully!');
-    }
-  });
+    chrome.storage.local.set(options, function() {
+        if (showMessage) {
+            showStatus('Options saved');
+        }
+    });
 }
 
 function loadOptions() {
@@ -121,7 +147,15 @@ function loadOptions() {
     'url',
     'autoUpdate',
     'autoSend',
-    'mutedUsers'
+    'mutedUsers',
+    'destructableMessages',
+    'destructKeyword',
+    'defaultDestructTime',
+    'showDestructTimer',
+    'messageSpacing',
+    'crypticPhrase',
+    'messageBubbleColor',
+    'messageBubbleOpacity'
   ], function(items) {
     document.getElementById('codebookText').value = formatCodebook(items.codebook || {});
     document.getElementById('messagesToLoad').value = items.messagesToLoad || 50;
@@ -135,6 +169,14 @@ function loadOptions() {
     document.getElementById('autoSend').checked = items.autoSend !== false;
     loadUserColors(items.userColors || []);
     loadMutedUsers(items.mutedUsers || []);
+    document.getElementById('destructableMessages').checked = items.destructableMessages || false;
+    document.getElementById('destructKeyword').value = items.destructKeyword || '\\d ! d';
+    document.getElementById('defaultDestructTime').value = items.defaultDestructTime || 5;
+    document.getElementById('showDestructTimer').checked = items.showDestructTimer !== false;
+    document.getElementById('messageSpacing').value = items.messageSpacing || 5;
+    document.getElementById('crypticPhrase').value = items.crypticPhrase || '\\d ! d';
+    document.getElementById('messageBubbleColor').value = items.messageBubbleColor || '#1e1e3f';
+    document.getElementById('messageBubbleOpacity').value = items.messageBubbleOpacity || '70';
   });
 }
 
@@ -184,57 +226,147 @@ function showStatus(message, isError = false) {
   }, 3000);
 }
 
-function processFile(file) {
-  if (!file) return;
-  
-  if (file.type !== "text/plain") {
-    showStatus("Please upload a .txt file.", true);
-    return;
-  }
+function handleFileUpload(file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const content = e.target.result;
+        if (file.name.endsWith('.json')) {
+            handleJsonUpload(content);
+        } else if (file.name.endsWith('.txt')) {
+            handleTxtUpload(content);
+        } else {
+            showStatus('Unsupported file format. Please use .json or .txt files.', true);
+        }
+    };
+    reader.readAsText(file);
+}
 
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    document.getElementById("codebookText").value = e.target.result;
+function handleJsonUpload(content) {
+    try {
+        const importedData = JSON.parse(content);
+        if (importedData.codebook) {
+            document.getElementById('codebookText').value = formatCodebook(importedData.codebook);
+            
+            // Update other settings if they exist in the imported data
+            if (importedData.destructableMessages !== undefined) {
+                document.getElementById('destructableMessages').checked = importedData.destructableMessages;
+            }
+            if (importedData.destructKeyword) {
+                document.getElementById('destructKeyword').value = importedData.destructKeyword;
+            }
+            if (importedData.crypticPhrase) {
+                document.getElementById('crypticPhrase').value = importedData.crypticPhrase;
+            }
+            if (importedData.defaultDestructTime) {
+                document.getElementById('defaultDestructTime').value = importedData.defaultDestructTime;
+            }
+            if (importedData.showDestructTimer !== undefined) {
+                document.getElementById('showDestructTimer').checked = importedData.showDestructTimer;
+            }
+
+            saveOptions();
+            showStatus('Codebook and settings imported successfully!');
+        } else {
+            showStatus('Invalid JSON format: missing codebook', true);
+        }
+    } catch (error) {
+        showStatus('Error parsing JSON file: ' + error.message, true);
+    }
+}
+
+function handleTxtUpload(content) {
+    document.getElementById('codebookText').value = content;
     autoSaveCodebook();
-  };
-  reader.readAsText(file);
+    showStatus('Codebook imported successfully!');
+}
+
+function formatCodebook(codebook) {
+    return Object.entries(codebook).map(([key, value]) => `${key} : ${value}`).join('\n');
+}
+
+function processFile(file) {
+    if (file) {
+        handleFileUpload(file);
+    }
 }
 
 function downloadCodebook() {
-  const codebookTextArea = document.getElementById("codebookText");
-  const content = codebookTextArea.value;
-  const blob = new Blob([content], { type: 'text/plain' });
-  const url = URL.createObjectURL(blob);
-  
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'codebook.txt';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+    chrome.storage.local.get(null, (items) => {
+        const codebookText = document.getElementById("codebookText").value;
+        const codebook = parseCodebook(codebookText);
+        
+        const exportData = {
+            codebook: codebook,
+            destructableMessages: items.destructableMessages,
+            destructKeyword: items.destructKeyword,
+            crypticPhrase: items.crypticPhrase,
+            defaultDestructTime: items.defaultDestructTime,
+            showDestructTimer: items.showDestructTimer
+        };
+
+        const jsonBlob = new Blob([JSON.stringify(exportData, null, 2)], {type: 'application/json'});
+        const txtBlob = new Blob([codebookText], {type: 'text/plain'});
+        
+        const jsonUrl = URL.createObjectURL(jsonBlob);
+        const txtUrl = URL.createObjectURL(txtBlob);
+        
+        const jsonLink = createDownloadLink(jsonUrl, 'cryptic_chat_codebook_and_settings.json');
+        const txtLink = createDownloadLink(txtUrl, 'codebook.txt');
+        
+        document.body.appendChild(jsonLink);
+        document.body.appendChild(txtLink);
+        
+        jsonLink.click();
+        txtLink.click();
+        
+        document.body.removeChild(jsonLink);
+        document.body.removeChild(txtLink);
+        
+        URL.revokeObjectURL(jsonUrl);
+        URL.revokeObjectURL(txtUrl);
+    });
 }
 
-function handleDragOver(event) {
-  event.preventDefault();
-  event.stopPropagation();
-  event.dataTransfer.dropEffect = "copy";
-  event.target.classList.add("dragover");
+function createDownloadLink(url, filename) {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    return link;
 }
 
-function handleDragLeave(event) {
-  event.preventDefault();
-  event.stopPropagation();
-  event.target.classList.remove("dragover");
+function parseCodebook(codebookText) {
+    const lines = codebookText.split('\n');
+    const codebook = {};
+    for (const line of lines) {
+        const [key, value] = line.split(':').map(item => item.trim());
+        if (key && value) {
+            codebook[key] = value;
+        }
+    }
+    return codebook;
 }
 
-function handleDrop(event) {
-  event.preventDefault();
-  event.stopPropagation();
-  event.target.classList.remove("dragover");
+function handleDragOver(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+    this.classList.add('dragover');
+}
 
-  const file = event.dataTransfer.files[0];
-  processFile(file);
+function handleDragLeave(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.classList.remove('dragover');
+}
+
+function handleDrop(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.classList.remove('dragover');
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        handleFileUpload(files[0]);
+    }
 }
 
 function updateFromUrl() {
@@ -297,5 +429,67 @@ function addMutedUserElement(username) {
   element.querySelector('.removeMutedUser').addEventListener('click', () => {
     container.removeChild(element);
     saveOptions();
+  });
+}
+
+function resetTheme() {
+  const defaultTheme = {
+    backgroundColor: '#141422',
+    inputBoxColor: '#1e1e3f',
+    headerColor: '#1a1a40',
+    userColors: [],
+    windowTransparency: 90,
+    messageSpacing: 5,
+    messageBubbleColor: '#1e1e3f',
+    messageBubbleOpacity: 70
+  };
+
+  Object.entries(defaultTheme).forEach(([key, value]) => {
+    const element = document.getElementById(key);
+    if (element) {
+      if (element.type === 'color' || element.type === 'text' || element.type === 'number') {
+        element.value = value;
+      } else if (element.type === 'checkbox') {
+        element.checked = value;
+      }
+    }
+  });
+
+  loadUserColors(defaultTheme.userColors);
+  autoSave();
+  showStatus('Theme reset to default!');
+}
+
+function exportCodebook() {
+  chrome.storage.local.get(null, (items) => {
+    const exportData = {
+      codebook: items.codebook,
+      destructableMessages: items.destructableMessages,
+      destructKeyword: items.destructKeyword,
+      crypticPhrase: items.crypticPhrase,
+      defaultDestructTime: items.defaultDestructTime,
+      showDestructTimer: items.showDestructTimer
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'cryptic_chat_codebook_and_settings.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+}
+
+function autoSave() {
+  saveOptions(false);
+  document.getElementById('autoSaveStatus').textContent = 'Auto-saved';
+  setTimeout(() => {
+    document.getElementById('autoSaveStatus').textContent = '';
+  }, 2000);
+
+  // Send a message to the content script to update styles
+  chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+    chrome.tabs.sendMessage(tabs[0].id, {action: "updateStyles"});
   });
 }

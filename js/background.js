@@ -115,9 +115,10 @@ function isValidMessage(request) {
 function processMessage(request, sendResponse) {
   let processedMessage = request.message;
   
-  chrome.storage.local.get(['codebook', 'mutedUsers'], function(result) {
+  chrome.storage.local.get(['codebook', 'mutedUsers', 'crypticPhrase'], function(result) {
     const codebook = result.codebook || {};
     const mutedUsers = result.mutedUsers || [];
+    const crypticPhrase = result.crypticPhrase || '\\d ! d';
     
     // Check if the message is from a muted user
     const username = extractUsername(processedMessage);
@@ -132,8 +133,12 @@ function processMessage(request, sendResponse) {
           processedMessage = processedMessage.replace(new RegExp(escapeRegExp(key), 'g'), codebook[key]);
         }
       }
+      // Replace default cryptic phrase with custom one
+      processedMessage = processedMessage.replace(/\\d ! d/g, crypticPhrase);
       sendResponse({ encryptedMessage: processedMessage });
     } else {
+      // Replace custom cryptic phrase with default one before decryption
+      processedMessage = processedMessage.replace(new RegExp(escapeRegExp(crypticPhrase), 'g'), '\\d ! d');
       for (const key in codebook) {
         if (codebook.hasOwnProperty(key)) {
           processedMessage = processedMessage.replace(new RegExp(escapeRegExp(codebook[key]), 'g'), key);
