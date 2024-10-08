@@ -69,6 +69,8 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById(id).addEventListener('change', debounce(autoSave, 500));
     document.getElementById(id).addEventListener('input', debounce(autoSave, 500));
   });
+
+  document.getElementById('caseInsensitiveEncryption').addEventListener('change', saveOptions);
 });
 
 function debounce(func, delay) {
@@ -129,7 +131,8 @@ function saveOptions(showMessage = true) {
         messageBubbleOpacity: document.getElementById('messageBubbleOpacity').value,
         userColors: getUserColors(),
         mutedUsers: getMutedUsers(),
-        autoSend: document.getElementById('autoSend').checked
+        autoSend: document.getElementById('autoSend').checked,
+        caseInsensitiveEncryption: document.getElementById('caseInsensitiveEncryption').checked
     };
 
     chrome.storage.local.set(options, function() {
@@ -160,7 +163,8 @@ function loadOptions() {
     'messageSpacing',
     'crypticPhrase',
     'messageBubbleColor',
-    'messageBubbleOpacity'
+    'messageBubbleOpacity',
+    'caseInsensitiveEncryption'
   ], function(items) {
     document.getElementById('codebookText').value = formatCodebook(items.codebook || {});
     document.getElementById('messagesToLoad').value = items.messagesToLoad || 50;
@@ -182,6 +186,7 @@ function loadOptions() {
     document.getElementById('crypticPhrase').value = items.crypticPhrase || '\\d ! d';
     document.getElementById('messageBubbleColor').value = items.messageBubbleColor || '#1e1e3f';
     document.getElementById('messageBubbleOpacity').value = items.messageBubbleOpacity || '70';
+    document.getElementById('caseInsensitiveEncryption').checked = items.caseInsensitiveEncryption || false;
   });
 }
 
