@@ -115,11 +115,22 @@ function isValidMessage(request) {
 function processMessage(request, sendResponse) {
   let processedMessage = request.message;
   
-  chrome.storage.local.get(['codebook', 'mutedUsers', 'crypticPhrase', 'caseInsensitiveEncryption'], function(result) {
+  chrome.storage.local.get([
+    'codebook', 
+    'mutedUsers', 
+    'crypticPhrase', 
+    'caseInsensitiveEncryption',
+    'destructableMessages',
+    'destructKeyword',
+    'defaultDestructTime'
+  ], function(result) {
     const codebook = result.codebook || {};
     const mutedUsers = result.mutedUsers || [];
     const crypticPhrase = result.crypticPhrase || '\\d ! d';
     const caseInsensitiveEncryption = result.caseInsensitiveEncryption || false;
+    const destructableMessages = result.destructableMessages || false;
+    const destructKeyword = result.destructKeyword || '\\d ! d';
+    const defaultDestructTime = result.defaultDestructTime || 5;
     
     // Check if the message is from a muted user
     const username = extractUsername(processedMessage);
@@ -129,6 +140,19 @@ function processMessage(request, sendResponse) {
     }
 
     if (request.action === "encrypt") {
+      // Handle destructible messages
+      if (destructableMessages) {
+        const destructRegex = caseInsensitiveEncryption 
+          ? new RegExp(escapeRegExp(destructKeyword), 'gi')
+          : new RegExp(escapeRegExp(destructKeyword), 'g');
+        const destructMatch = processedMessage.match(destructRegex);
+        if (destructMatch) {
+          const minutes = destructMatch[1] || defaultDestructTime;
+          processedMessage = processedMessage.replace(destructMatch[0], `${crypticPhrase}${minutes}//`);
+        }
+      }
+
+      // Encrypt the message
       for (const key in codebook) {
         if (codebook.hasOwnProperty(key)) {
           const regex = caseInsensitiveEncryption 
@@ -144,12 +168,24 @@ function processMessage(request, sendResponse) {
           });
         }
       }
-      // Replace default cryptic phrase with custom one
-      processedMessage = processedMessage.replace(/\\d ! d/g, crypticPhrase);
       sendResponse({ encryptedMessage: processedMessage });
     } else {
-      // Replace custom cryptic phrase with default one before decryption
-      processedMessage = processedMessage.replace(new RegExp(escapeRegExp(crypticPhrase), 'g'), '\\d ! d');
+      // Decrypt the message
+      // Handle destructible messages
+      const destructRegex = caseInsensitiveEncryption 
+        ? new RegExp(escapeRegExp(crypticPhrase) + '(\\d+)//', 'gi')
+        : new RegExp(escapeRegExp(crypticPhrase) + '(\\d+)//', 'g');
+      const destructMatch = processedMessage.match(destructRegex);
+      
+      if (destructMatch) {
+        const destructMinutes = parseInt(destructMatch[1]);
+        // Remove the destruction keyword from the message
+        processedMessage = processedMessage.replace(destructMatch[0], '').trim();
+        // Add a note about the message being destructible
+        processedMessage += ` [This message will self-destruct in ${destructMinutes} minutes]`;
+      }
+
+      // Decrypt the message
       for (const key in codebook) {
         if (codebook.hasOwnProperty(key)) {
           const regex = caseInsensitiveEncryption 
