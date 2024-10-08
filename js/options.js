@@ -1,3 +1,168 @@
+async function encryptCodebook(data, password) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage({ action: 'encryptData', data, password }, response => {
+      if (response.error) {
+        reject(new Error(response.error));
+      } else {
+        resolve(response.encryptedData);
+      }
+    });
+  });
+}
+
+async function decryptCodebook(encryptedData, password) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage({ action: 'decryptData', data: encryptedData, password }, response => {
+      if (response.error) {
+        reject(new Error(response.error));
+      } else {
+        resolve(response.decryptedData);
+      }
+    });
+  });
+}
+
+async function exportCodebookOnly() {
+  try {
+    chrome.storage.local.get(['codebook', 'useCodebookEncryption', 'codebookPassword'], async (items) => {
+      const exportData = {
+        codebook: items.codebook
+      };
+
+      const useCodebookEncryption = items.useCodebookEncryption;
+      let dataToExport;
+
+      if (useCodebookEncryption) {
+        const password = items.codebookPassword;
+        if (!password) {
+          showStatus('Please set a password for codebook encryption in the options', true);
+          return;
+        }
+        dataToExport = await encryptCodebook(exportData, password);
+        dataToExport.encrypted = true;
+      } else {
+        dataToExport = exportData;
+        dataToExport.encrypted = false;
+      }
+
+      const blob = new Blob([JSON.stringify(dataToExport, null, 2)], {type: 'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'cryptic_chat_codebook.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  } catch (error) {
+    showStatus('Error exporting codebook: ' + error.message, true);
+  }
+}
+
+async function exportCodebookWithSettings() {
+  try {
+    chrome.storage.local.get(null, async (items) => {
+      const exportData = {
+        codebook: items.codebook,
+        destructableMessages: items.destructableMessages,
+        destructKeyword: items.destructKeyword,
+        crypticPhrase: items.crypticPhrase,
+        defaultDestructTime: items.defaultDestructTime,
+        showDestructTimer: items.showDestructTimer
+      };
+
+      const useCodebookEncryption = items.useCodebookEncryption;
+      let dataToExport;
+
+      if (useCodebookEncryption) {
+        const password = items.codebookPassword;
+        if (!password) {
+          showStatus('Please set a password for codebook encryption in the options', true);
+          return;
+        }
+        dataToExport = await encryptCodebook(exportData, password);
+        dataToExport.encrypted = true;
+      } else {
+        dataToExport = exportData;
+        dataToExport.encrypted = false;
+      }
+
+      const blob = new Blob([JSON.stringify(dataToExport, null, 2)], {type: 'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'cryptic_chat_codebook_and_settings.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  } catch (error) {
+    showStatus('Error exporting data: ' + error.message, true);
+  }
+}
+
+async function handleFileUpload(file) {
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    try {
+      const content = e.target.result;
+      const importedData = JSON.parse(content);
+
+      if (importedData.encrypted) {
+        const password = prompt('Please enter the password to decrypt the imported codebook:');
+        if (!password) {
+          showStatus('Password is required for codebook decryption', true);
+          return;
+        }
+        const decryptedData = await decryptCodebook(importedData, password);
+        handleImportedData(decryptedData);
+      } else {
+        handleImportedData(importedData);
+      }
+    } catch (error) {
+      showStatus('Error processing imported file: ' + error.message, true);
+    }
+  };
+  reader.readAsText(file);
+}
+
+// Add these functions to handle the new features
+
+function exportCodebookTxt() {
+    const codebookText = document.getElementById("codebookText").value;
+    const blob = new Blob([codebookText], {type: 'text/plain'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'codebook.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+let originalCodebook = '';
+
+function searchCodebook() {
+    const searchTerm = document.getElementById("codebookSearch").value.toLowerCase();
+    const codebookText = document.getElementById("codebookText");
+    
+    if (!originalCodebook) {
+        originalCodebook = codebookText.value;
+    }
+    
+    if (searchTerm === '') {
+        codebookText.value = originalCodebook;
+    } else {
+        const lines = originalCodebook.split('\n');
+        const filteredLines = lines.filter(line => line.toLowerCase().includes(searchTerm));
+        codebookText.value = filteredLines.join('\n');
+    }
+}
+
+function updatePhraseCount() {
+    const codebookText = document.getElementById("codebookText").value;
+    const lines = codebookText.split('\n').filter(line => line.trim() !== '');
+    const phraseCount = lines.length;
+    document.getElementById("codebookPhraseCount").textContent = `Phrases: ${phraseCount}`;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   const codebookTextArea = document.getElementById("codebookText");
   const uploadBtn = document.getElementById("uploadBtn");
@@ -14,13 +179,20 @@ document.addEventListener('DOMContentLoaded', function() {
   const newMutedUserInput = document.getElementById("newMutedUser");
   const resetThemeBtn = document.getElementById("resetTheme");
   const clearDataBtn = document.getElementById('clearDataBtn');
+  const exportCodebookBtn = document.getElementById('exportCodebook');
+  const exportCodebookTxtBtn = document.getElementById('exportCodebookTxt');
+  const codebookSearch = document.getElementById('codebookSearch');
+  const useCodebookEncryption = document.getElementById('useCodebookEncryption');
 
   loadOptions();
 
-  if (codebookTextArea) codebookTextArea.addEventListener("input", debounce(autoSaveCodebook, 500));
-  if (uploadBtn) uploadBtn.addEventListener("click", () => fileInput.click());
-  if (downloadBtn) downloadBtn.addEventListener("click", downloadCodebook);
-  if (fileInput) fileInput.addEventListener("change", (event) => handleFileUpload(event.target.files[0]));
+  if (codebookTextArea) codebookTextArea.addEventListener("input", debounce(() => {
+    autoSaveCodebook();
+    updatePhraseCount();
+  }, 500));
+  if (uploadBtn) uploadBtn.addEventListener('click', () => document.getElementById('fileInput').click());
+  if (downloadBtn) downloadBtn.addEventListener('click', exportCodebookOnly);
+  if (fileInput) fileInput.addEventListener('change', (e) => handleFileUpload(e.target.files[0]));
   if (updateFromUrlBtn) updateFromUrlBtn.addEventListener("click", updateFromUrl);
   if (autoUpdateCheckbox) autoUpdateCheckbox.addEventListener("change", saveOptions);
   if (messagesToLoadInput) messagesToLoadInput.addEventListener("input", saveOptions);
@@ -29,9 +201,9 @@ document.addEventListener('DOMContentLoaded', function() {
   if (addUserColorBtn) addUserColorBtn.addEventListener("click", () => addUserColorRow());
 
   if (dropZone) {
-    dropZone.addEventListener("dragover", handleDragOver);
-    dropZone.addEventListener("dragleave", handleDragLeave);
-    dropZone.addEventListener("drop", handleDrop);
+    dropZone.addEventListener('dragover', handleDragOver);
+    dropZone.addEventListener('dragleave', handleDragLeave);
+    dropZone.addEventListener('drop', handleDrop);
   }
 
   if (addMutedUserBtn && newMutedUserInput) {
@@ -56,7 +228,17 @@ document.addEventListener('DOMContentLoaded', function() {
     clearDataBtn.addEventListener('click', clearAllData);
   }
 
-  document.getElementById('exportCodebook').addEventListener('click', exportCodebook);
+  if (exportCodebookBtn) exportCodebookBtn.addEventListener('click', exportCodebookWithSettings);
+  if (exportCodebookTxtBtn) exportCodebookTxtBtn.addEventListener('click', exportCodebookTxt);
+  if (codebookSearch) codebookSearch.addEventListener('input', debounce(searchCodebook, 300));
+
+  if (useCodebookEncryption) {
+    useCodebookEncryption.addEventListener('change', function() {
+      document.getElementById('codebookPassword').disabled = !this.checked;
+      document.getElementById('exportCodebookTxt').disabled = this.checked;
+    });
+  }
+
   document.getElementById('saveBtn').addEventListener('click', () => saveOptions(true));
 
   // Add event listeners for auto-save
@@ -71,6 +253,21 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   document.getElementById('caseInsensitiveEncryption').addEventListener('change', saveOptions);
+
+  document.getElementById('useCodebookEncryption').addEventListener('change', function() {
+    document.getElementById('codebookPassword').disabled = !this.checked;
+    saveOptions(false);
+  });
+
+  document.getElementById('codebookPassword').addEventListener('input', debounce(saveOptions, 500));
+
+  if (codebookSearch) {
+    codebookSearch.addEventListener('input', debounce(searchCodebook, 300));
+  }
+
+  if (codebookTextArea) {
+    originalCodebook = codebookTextArea.value;
+  }
 });
 
 function debounce(func, delay) {
@@ -99,18 +296,19 @@ function autoSaveCodebook() {
     }
   }
 
-  if (errorLines.length > 0) {
-    showStatus(`Error on line(s): ${errorLines.join(', ')}. Format should be "key : value"`, true);
-  } else {
-    chrome.storage.local.set({ codebook: updatedCodebook }, () => {
-      if (chrome.runtime.lastError) {
-        showStatus('Error saving codebook: ' + chrome.runtime.lastError.message, true);
+  chrome.storage.local.set({ codebook: updatedCodebook }, function() {
+    if (chrome.runtime.lastError) {
+      showStatus('Error saving codebook: ' + chrome.runtime.lastError.message, true);
+    } else {
+      originalCodebook = codebookTextArea.value; // Update the originalCodebook
+      if (errorLines.length > 0) {
+        showStatus('Codebook saved with errors. Please check lines: ' + errorLines.join(', '), true);
       } else {
         showStatus('Codebook saved successfully!');
         chrome.runtime.sendMessage({ action: 'codebookUpdated' });
       }
-    });
-  }
+    }
+  });
 }
 
 function saveOptions(showMessage = true) {
@@ -134,6 +332,8 @@ function saveOptions(showMessage = true) {
         autoSend: document.getElementById('autoSend').checked,
         caseInsensitiveEncryption: document.getElementById('caseInsensitiveEncryption').checked,
         messageCheckInterval: document.getElementById('messageCheckInterval').value,
+        useCodebookEncryption: document.getElementById('useCodebookEncryption').checked,
+        codebookPassword: document.getElementById('codebookPassword').value,
     };
 
     chrome.storage.local.set(options, function() {
@@ -169,6 +369,8 @@ function loadOptions() {
     'messageBubbleOpacity',
     'caseInsensitiveEncryption',
     'messageCheckInterval',
+    'useCodebookEncryption',
+    'codebookPassword',
   ], function(items) {
     document.getElementById('codebookText').value = formatCodebook(items.codebook || {});
     document.getElementById('messagesToLoad').value = items.messagesToLoad || 50;
@@ -192,6 +394,19 @@ function loadOptions() {
     document.getElementById('messageBubbleOpacity').value = items.messageBubbleOpacity || '70';
     document.getElementById('caseInsensitiveEncryption').checked = items.caseInsensitiveEncryption || false;
     document.getElementById('messageCheckInterval').value = items.messageCheckInterval || 5;
+    document.getElementById('useCodebookEncryption').checked = items.useCodebookEncryption || false;
+    document.getElementById('codebookPassword').value = items.codebookPassword || '';
+    document.getElementById('codebookPassword').disabled = !items.useCodebookEncryption;
+    updatePhraseCount();
+  });
+
+  chrome.storage.local.get('useCodebookEncryption', function(result) {
+    const useCodebookEncryption = document.getElementById('useCodebookEncryption');
+    if (useCodebookEncryption) {
+      useCodebookEncryption.checked = result.useCodebookEncryption || false;
+      document.getElementById('codebookPassword').disabled = !useCodebookEncryption.checked;
+      document.getElementById('exportCodebookTxt').disabled = useCodebookEncryption.checked;
+    }
   });
 }
 
@@ -241,147 +456,27 @@ function showStatus(message, isError = false) {
   }, 3000);
 }
 
-function handleFileUpload(file) {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const content = e.target.result;
-        if (file.name.endsWith('.json')) {
-            handleJsonUpload(content);
-        } else if (file.name.endsWith('.txt')) {
-            handleTxtUpload(content);
-        } else {
-            showStatus('Unsupported file format. Please use .json or .txt files.', true);
-        }
-    };
-    reader.readAsText(file);
-}
-
-function handleJsonUpload(content) {
-    try {
-        const importedData = JSON.parse(content);
-        if (importedData.codebook) {
-            document.getElementById('codebookText').value = formatCodebook(importedData.codebook);
-            
-            // Update other settings if they exist in the imported data
-            if (importedData.destructableMessages !== undefined) {
-                document.getElementById('destructableMessages').checked = importedData.destructableMessages;
-            }
-            if (importedData.destructKeyword) {
-                document.getElementById('destructKeyword').value = importedData.destructKeyword;
-            }
-            if (importedData.crypticPhrase) {
-                document.getElementById('crypticPhrase').value = importedData.crypticPhrase;
-            }
-            if (importedData.defaultDestructTime) {
-                document.getElementById('defaultDestructTime').value = importedData.defaultDestructTime;
-            }
-            if (importedData.showDestructTimer !== undefined) {
-                document.getElementById('showDestructTimer').checked = importedData.showDestructTimer;
-            }
-
-            saveOptions();
-            showStatus('Codebook and settings imported successfully!');
-        } else {
-            showStatus('Invalid JSON format: missing codebook', true);
-        }
-    } catch (error) {
-        showStatus('Error parsing JSON file: ' + error.message, true);
-    }
-}
-
-function handleTxtUpload(content) {
-    document.getElementById('codebookText').value = content;
-    autoSaveCodebook();
-    showStatus('Codebook imported successfully!');
-}
-
-function formatCodebook(codebook) {
-    return Object.entries(codebook).map(([key, value]) => `${key} : ${value}`).join('\n');
-}
-
-function processFile(file) {
-    if (file) {
-        handleFileUpload(file);
-    }
-}
-
-function downloadCodebook() {
-    chrome.storage.local.get(null, (items) => {
-        const codebookText = document.getElementById("codebookText").value;
-        const codebook = parseCodebook(codebookText);
-        
-        const exportData = {
-            codebook: codebook,
-            destructableMessages: items.destructableMessages,
-            destructKeyword: items.destructKeyword,
-            crypticPhrase: items.crypticPhrase,
-            defaultDestructTime: items.defaultDestructTime,
-            showDestructTimer: items.showDestructTimer
-        };
-
-        const jsonBlob = new Blob([JSON.stringify(exportData, null, 2)], {type: 'application/json'});
-        const txtBlob = new Blob([codebookText], {type: 'text/plain'});
-        
-        const jsonUrl = URL.createObjectURL(jsonBlob);
-        const txtUrl = URL.createObjectURL(txtBlob);
-        
-        const jsonLink = createDownloadLink(jsonUrl, 'cryptic_chat_codebook_and_settings.json');
-        const txtLink = createDownloadLink(txtUrl, 'codebook.txt');
-        
-        document.body.appendChild(jsonLink);
-        document.body.appendChild(txtLink);
-        
-        jsonLink.click();
-        txtLink.click();
-        
-        document.body.removeChild(jsonLink);
-        document.body.removeChild(txtLink);
-        
-        URL.revokeObjectURL(jsonUrl);
-        URL.revokeObjectURL(txtUrl);
-    });
-}
-
-function createDownloadLink(url, filename) {
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    return link;
-}
-
-function parseCodebook(codebookText) {
-    const lines = codebookText.split('\n');
-    const codebook = {};
-    for (const line of lines) {
-        const [key, value] = line.split(':').map(item => item.trim());
-        if (key && value) {
-            codebook[key] = value;
-        }
-    }
-    return codebook;
-}
-
 function handleDragOver(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = 'copy';
-    this.classList.add('dragover');
+  e.preventDefault();
+  e.stopPropagation();
+  e.dataTransfer.dropEffect = 'copy';
+  this.classList.add('dragover');
 }
 
 function handleDragLeave(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    this.classList.remove('dragover');
+  e.preventDefault();
+  e.stopPropagation();
+  this.classList.remove('dragover');
 }
 
 function handleDrop(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    this.classList.remove('dragover');
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-        handleFileUpload(files[0]);
-    }
+  e.preventDefault();
+  e.stopPropagation();
+  this.classList.remove('dragover');
+  const files = e.dataTransfer.files;
+  if (files.length > 0) {
+    handleFileUpload(files[0]);
+  }
 }
 
 function updateFromUrl() {
@@ -495,27 +590,6 @@ function resetTheme() {
   showStatus('Theme reset to default!');
 }
 
-function exportCodebook() {
-  chrome.storage.local.get(null, (items) => {
-    const exportData = {
-      codebook: items.codebook,
-      destructableMessages: items.destructableMessages,
-      destructKeyword: items.destructKeyword,
-      crypticPhrase: items.crypticPhrase,
-      defaultDestructTime: items.defaultDestructTime,
-      showDestructTimer: items.showDestructTimer
-    };
-
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], {type: 'application/json'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'cryptic_chat_codebook_and_settings.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  });
-}
-
 function autoSave() {
   saveOptions(false);
   document.getElementById('autoSaveStatus').textContent = 'Auto-saved';
@@ -554,6 +628,13 @@ function clearAllData() {
         document.getElementById('crypticPhrase').value = '\\d ! d';
         document.getElementById('messageBubbleColor').value = '#1e1e3f';
         document.getElementById('messageBubbleOpacity').value = '70';
+        document.getElementById('caseInsensitiveEncryption').checked = false;
+        document.getElementById('messageCheckInterval').value = '5';
+
+        // Reset codebook encryption settings
+        document.getElementById('useCodebookEncryption').checked = false;
+        document.getElementById('codebookPassword').value = '';
+        document.getElementById('codebookPassword').disabled = true;
 
         // Clear user colors and muted users
         document.getElementById('userColorContainer').innerHTML = '';
@@ -563,5 +644,39 @@ function clearAllData() {
         saveOptions();
       }
     });
+  }
+}
+
+function handleImportedData(importedData) {
+  try {
+    // Update codebook
+    if (importedData.codebook) {
+      document.getElementById('codebookText').value = formatCodebook(importedData.codebook);
+      chrome.storage.local.set({ codebook: importedData.codebook });
+    }
+
+    // Update other settings
+    if (importedData.destructableMessages !== undefined) {
+      document.getElementById('destructableMessages').checked = importedData.destructableMessages;
+    }
+    if (importedData.destructKeyword) {
+      document.getElementById('destructKeyword').value = importedData.destructKeyword;
+    }
+    if (importedData.crypticPhrase) {
+      document.getElementById('crypticPhrase').value = importedData.crypticPhrase;
+    }
+    if (importedData.defaultDestructTime) {
+      document.getElementById('defaultDestructTime').value = importedData.defaultDestructTime;
+    }
+    if (importedData.showDestructTimer !== undefined) {
+      document.getElementById('showDestructTimer').checked = importedData.showDestructTimer;
+    }
+
+    // Save the imported settings
+    saveOptions();
+
+    showStatus('Codebook and settings imported successfully!');
+  } catch (error) {
+    showStatus('Error processing imported data: ' + error.message, true);
   }
 }

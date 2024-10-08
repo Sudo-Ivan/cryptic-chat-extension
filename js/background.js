@@ -98,6 +98,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         codebook = updatedCodebook;
       })
       .catch((error) => console.error('Error updating codebook:', error));
+  } else if (request.action === 'encryptData') {
+    generateKey(request.password)
+      .then(key => encryptData(request.data, key))
+      .then(encryptedData => sendResponse({ encryptedData }))
+      .catch(error => sendResponse({ error: error.message }));
+    return true;
+  } else if (request.action === 'decryptData') {
+    generateKey(request.password)
+      .then(key => decryptData(request.data, key))
+      .then(decryptedData => sendResponse({ decryptedData }))
+      .catch(error => sendResponse({ error: error.message }));
+    return true;
   } else if (isValidMessage(request)) {
     processMessage(request, sendResponse);
     return true;
@@ -181,7 +193,6 @@ function processMessage(request, sendResponse) {
         const destructMinutes = parseInt(destructMatch[1]);
         // Remove the destruction keyword from the message
         processedMessage = processedMessage.replace(destructMatch[0], '').trim();
-        // Add a note about the message being destructible
         processedMessage += ` [This message will self-destruct in ${destructMinutes} minutes]`;
       }
 
@@ -207,7 +218,6 @@ function processMessage(request, sendResponse) {
 
 function extractUsername(message) {
   // This function should extract the username from the message
-  // You may need to adjust this based on your message format
   const match = message.match(/^([^:]+):/);
   return match ? match[1].trim() : '';
 }
@@ -277,7 +287,6 @@ function checkForNewMessages() {
 }
 
 chrome.runtime.onInstalled.addListener(() => {
-    // ... existing code ...
     chrome.storage.local.get('messageCheckInterval', (result) => {
         const interval = result.messageCheckInterval || 5;
         startMessageCheckInterval(interval);
@@ -291,5 +300,39 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             startMessageCheckInterval(interval);
         });
     }
-    // ... existing message handling ...
 });
+
+// Add these functions at the beginning of the file
+async function generateKey(password) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return crypto.subtle.importKey('raw', hash, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+}
+
+async function encryptData(data, key) {
+  const encoder = new TextEncoder();
+  const encodedData = encoder.encode(JSON.stringify(data));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encryptedContent = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: iv },
+    key,
+    encodedData
+  );
+  return {
+    iv: Array.from(iv),
+    encryptedData: Array.from(new Uint8Array(encryptedContent))
+  };
+}
+
+async function decryptData(encryptedData, key) {
+  const iv = new Uint8Array(encryptedData.iv);
+  const data = new Uint8Array(encryptedData.encryptedData);
+  const decryptedContent = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: iv },
+    key,
+    data
+  );
+  const decoder = new TextDecoder();
+  return JSON.parse(decoder.decode(decryptedContent));
+}
