@@ -1,22 +1,17 @@
 window.CrypticChat = window.CrypticChat || {};
 
-CrypticChat.escapeRegExp = function(string) {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-};
-
-CrypticChat.Discord = {
-    discordParse: function(codebook) {
+CrypticChat.Element = {
+    elementParse: function(codebook) {
         return new Promise((resolve, reject) => {
-            chrome.storage.local.get(['mutedUsers', 'discordSelectors'], (result) => {
+            chrome.storage.local.get(['mutedUsers', 'elementSelectors'], (result) => {
                 const mutedUsers = result.mutedUsers || [];
-                const selectors = result.discordSelectors || {
-                    chatArea: '[class^="chatContent_"]',
-                    messageElements: '[id^="chat-messages-"]',
-                    contentElement: '[id^="message-content-"]',
-                    repliedTextPreview: '[class*="repliedTextPreview_"]',
-                    usernameElement: '[class*="username_"]',
-                    timestampElement: 'time',
-                    messageInput: 'div[role="textbox"][data-slate-editor="true"]'
+                const selectors = result.elementSelectors || {
+                    chatArea: '[class^="mx_RoomView_messagePanel"]',
+                    messageElements: '[class^="mx_EventTile"]',
+                    contentElement: '[class^="mx_EventTile_body"]',
+                    usernameElement: '[class^="mx_Username_color"][class*="mx_DisambiguatedProfile_displayName"]',
+                    timestampElement: '[class^="mx_MessageTimestamp"]',
+                    messageInput: '[class^="mx_BasicMessageComposer_input"]'
                 };
                 let decryptedTexts = [];
                 const chatArea = document.querySelector(selectors.chatArea);
@@ -44,7 +39,7 @@ CrypticChat.Discord = {
                     });
                     resolve(decryptedTexts);
                 }).catch(error => {
-                    console.error("Error in discordParse:", error);
+                    console.error("Error in elementParse:", error);
                     resolve(decryptedTexts);
                 });
             });
@@ -60,12 +55,6 @@ CrypticChat.Discord = {
                     return;
                 }
 
-                const repliedTextPreview = messageElement.querySelector(selectors.repliedTextPreview);
-                if (repliedTextPreview) {
-                    resolve(null);
-                    return;
-                }
-
                 const originalText = contentElement.textContent.trim();
                 let decryptedText = originalText;
                 let isDecrypted = false;
@@ -74,7 +63,6 @@ CrypticChat.Discord = {
                     const caseInsensitiveEncryption = result.caseInsensitiveEncryption || false;
                     const crypticPhrase = result.crypticPhrase || '\\d ! d';
 
-                    // Sort the codebook keys by length in descending order
                     const sortedKeys = Object.keys(codebook).sort((a, b) => b.length - a.length);
 
                     for (const key of sortedKeys) {
@@ -96,52 +84,35 @@ CrypticChat.Discord = {
                     }
 
                     if (isDecrypted) {
-                        // Check for destructible message
                         const destructRegex = new RegExp(`${CrypticChat.escapeRegExp(crypticPhrase)}(\\d+)`, caseInsensitiveEncryption ? 'gi' : 'g');
                         const destructMatch = decryptedText.match(destructRegex);
-                        
+
                         if (destructMatch) {
                             const destructMinutes = parseInt(destructMatch[1]);
-                            const timestamp = messageElement.querySelector(selectors.timestampElement).dateTime;
-                            const messageTime = new Date(timestamp).getTime();
+                            const timestamp = messageElement.querySelector(selectors.timestampElement).getAttribute('data-timestamp');
+                            const messageTime = new Date(parseInt(timestamp)).getTime();
                             const currentTime = new Date().getTime();
-                            const timeDiff = (currentTime - messageTime) / (1000 * 60); // difference in minutes
+                            const timeDiff = (currentTime - messageTime) / (1000 * 60);
 
                             if (timeDiff >= destructMinutes) {
-                                resolve(null); // Message should be destroyed
+                                resolve(null);
                                 return;
                             }
 
-                            // Remove the destruction keyword from the message
                             decryptedText = decryptedText.replace(destructMatch[0], '').trim();
                         }
 
                         let username = 'Unknown User';
                         let timestamp = '';
 
-                        let usernameElement = messageElement.querySelector(selectors.usernameElement);
-                        let timestampElement = messageElement.querySelector(selectors.timestampElement);
-
-                        if (!usernameElement || !timestampElement) {
-                            let currentElement = messageElement;
-                            while (currentElement && (!usernameElement || !timestampElement)) {
-                                currentElement = currentElement.previousElementSibling;
-                                if (currentElement) {
-                                    if (!usernameElement) {
-                                        usernameElement = currentElement.querySelector(selectors.usernameElement);
-                                    }
-                                    if (!timestampElement) {
-                                        timestampElement = currentElement.querySelector(selectors.timestampElement);
-                                    }
-                                }
-                            }
-                        }
+                        const usernameElement = messageElement.querySelector(selectors.usernameElement);
+                        const timestampElement = messageElement.querySelector(selectors.timestampElement);
 
                         if (usernameElement) {
                             username = usernameElement.textContent.trim();
                         }
                         if (timestampElement) {
-                            timestamp = timestampElement.getAttribute('aria-label') || timestampElement.textContent.trim();
+                            timestamp = timestampElement.textContent.trim();
                         }
 
                         resolve(`${username}: ${decryptedText} - ${timestamp}`);
@@ -156,51 +127,22 @@ CrypticChat.Discord = {
         });
     },
 
-    setDiscordMessage: function(message, sendMessage = false) {
-        chrome.storage.local.get('discordSelectors', (result) => {
-            const selectors = result.discordSelectors || {
-                messageInput: 'div[role="textbox"][data-slate-editor="true"]'
+    setElementMessage: function(message, sendMessage = false) {
+        chrome.storage.local.get('elementSelectors', (result) => {
+            const selectors = result.elementSelectors || {
+                messageInput: '.mx_BasicMessageComposer_input'
             };
             const messageInput = document.querySelector(selectors.messageInput);
             if (!messageInput) {
-                console.error('Discord message input not found');
+                console.error('Element message input not found');
                 return;
             }
 
             messageInput.focus();
-
-            const insertText = (text) => {
-                const textEvent = new InputEvent('beforeinput', {
-                    bubbles: true,
-                    cancelable: true,
-                    inputType: 'insertText',
-                    data: text
-                });
-                messageInput.dispatchEvent(textEvent);
-            };
-
-            while (messageInput.firstChild) {
-                messageInput.removeChild(messageInput.firstChild);
-            }
-
-            insertText(message);
-
-            const inputEvent = new InputEvent('input', {
-                bubbles: true,
-                cancelable: true,
-                inputType: 'insertText',
-                data: message
-            });
-            messageInput.dispatchEvent(inputEvent);
-
             messageInput.textContent = message;
 
-            const range = document.createRange();
-            const sel = window.getSelection();
-            range.selectNodeContents(messageInput);
-            range.collapse(false);
-            sel.removeAllRanges();
-            sel.addRange(range);
+            const inputEvent = new Event('input', { bubbles: true, cancelable: true });
+            messageInput.dispatchEvent(inputEvent);
 
             if (sendMessage) {
                 const enterEvent = new KeyboardEvent('keydown', {
@@ -215,9 +157,9 @@ CrypticChat.Discord = {
     },
 
     init: function() {
-        // Any initialization code for Discord-specific functionality
+        // Any initialization code for Element-specific functionality
     }
 };
 
-// Initialize Discord-specific functionality
-CrypticChat.Discord.init();
+// Initialize Element-specific functionality
+CrypticChat.Element.init();
