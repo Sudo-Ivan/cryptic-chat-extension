@@ -72,13 +72,30 @@ chrome.runtime.onInstalled.addListener(() => {
       }
     }]
   });
+
+  chrome.storage.local.set({
+    elementSelectors: {
+      chatArea: '[class^="mx_RoomView_messagePanel"]',
+      messageElements: '[class^="mx_EventTile"]',
+      contentElement: '[class^="mx_EventTile_body"]',
+      usernameElement: '[class^="mx_Username_color"][class*="mx_DisambiguatedProfile_displayName"]',
+      timestampElement: '[class^="mx_MessageTimestamp"]',
+      messageInput: '[class^="mx_BasicMessageComposer_input"]'
+    }
+  });
+
+  chrome.storage.local.get('messageCheckInterval', (result) => {
+    const interval = result.messageCheckInterval || 5;
+    startMessageCheckInterval(interval);
+  });
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "encrypt" || info.menuItemId === "decrypt") {
     processMessage({
       action: info.menuItemId,
-      message: info.selectionText
+      message: info.selectionText,
+      platform: 'contextMenu'
     }, (response) => {
       openOrUpdatePopupWithResults(response, info.selectionText);
     });
@@ -110,6 +127,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .then(decryptedData => sendResponse({ decryptedData }))
       .catch(error => sendResponse({ error: error.message }));
     return true;
+  } else if (request.action === 'updateDiscordSelectors' || request.action === 'updateElementSelectors') {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      chrome.tabs.sendMessage(tabs[0].id, { action: request.action });
+    });
+  } else if (request.action === 'popoutCodebook') {
+    popoutCodebookWindow();
+  } else if (request.action === 'updateMessageCheckInterval') {
+    chrome.storage.local.get('messageCheckInterval', (result) => {
+      const interval = result.messageCheckInterval || 5;
+      startMessageCheckInterval(interval);
+    });
   } else if (isValidMessage(request)) {
     processMessage(request, sendResponse);
     return true;
@@ -121,12 +149,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 function isValidMessage(request) {
   return request &&
          (request.action === 'encrypt' || request.action === 'decrypt') &&
-         typeof request.message === 'string';
+         typeof request.message === 'string' &&
+         (request.platform === 'discord' || request.platform === 'element' || request.platform === 'contextMenu');
 }
 
 function processMessage(request, sendResponse) {
-  let processedMessage = request.message;
-  
   chrome.storage.local.get([
     'codebook', 
     'mutedUsers', 
@@ -143,6 +170,8 @@ function processMessage(request, sendResponse) {
     const destructableMessages = result.destructableMessages || false;
     const destructKeyword = result.destructKeyword || '\\d ! d';
     const defaultDestructTime = result.defaultDestructTime || 5;
+
+    let processedMessage = request.message;
     
     // Check if the message is from a muted user
     const username = extractUsername(processedMessage);
@@ -160,7 +189,7 @@ function processMessage(request, sendResponse) {
         const destructMatch = processedMessage.match(destructRegex);
         if (destructMatch) {
           const minutes = destructMatch[1] || defaultDestructTime;
-          processedMessage = processedMessage.replace(destructMatch[0], `${crypticPhrase}${minutes}//`);
+          processedMessage = processedMessage.replace(destructMatch[0], `${crypticPhrase}${minutes}`);
         }
       }
 
@@ -185,8 +214,8 @@ function processMessage(request, sendResponse) {
       // Decrypt the message
       // Handle destructible messages
       const destructRegex = caseInsensitiveEncryption 
-        ? new RegExp(escapeRegExp(crypticPhrase) + '(\\d+)//', 'gi')
-        : new RegExp(escapeRegExp(crypticPhrase) + '(\\d+)//', 'g');
+        ? new RegExp(escapeRegExp(crypticPhrase) + '(\\d+)', 'gi')
+        : new RegExp(escapeRegExp(crypticPhrase) + '(\\d+)', 'g');
       const destructMatch = processedMessage.match(destructRegex);
       
       if (destructMatch) {
@@ -217,7 +246,6 @@ function processMessage(request, sendResponse) {
 }
 
 function extractUsername(message) {
-  // This function should extract the username from the message
   const match = message.match(/^([^:]+):/);
   return match ? match[1].trim() : '';
 }
@@ -272,37 +300,20 @@ chrome.windows.onRemoved.addListener((windowId) => {
 let messageCheckIntervalId = null;
 
 function startMessageCheckInterval(interval) {
-    if (messageCheckIntervalId) {
-        clearInterval(messageCheckIntervalId);
-    }
-    messageCheckIntervalId = setInterval(checkForNewMessages, interval * 1000);
+  if (messageCheckIntervalId) {
+    clearInterval(messageCheckIntervalId);
+  }
+  messageCheckIntervalId = setInterval(checkForNewMessages, interval * 1000);
 }
 
 function checkForNewMessages() {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]) {
-            chrome.tabs.sendMessage(tabs[0].id, { action: 'checkForNewMessages' });
-        }
-    });
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs[0]) {
+      chrome.tabs.sendMessage(tabs[0].id, { action: 'checkForNewMessages' });
+    }
+  });
 }
 
-chrome.runtime.onInstalled.addListener(() => {
-    chrome.storage.local.get('messageCheckInterval', (result) => {
-        const interval = result.messageCheckInterval || 5;
-        startMessageCheckInterval(interval);
-    });
-});
-
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === 'updateMessageCheckInterval') {
-        chrome.storage.local.get('messageCheckInterval', (result) => {
-            const interval = result.messageCheckInterval || 5;
-            startMessageCheckInterval(interval);
-        });
-    }
-});
-
-// Add these functions at the beginning of the file
 async function generateKey(password) {
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
@@ -335,4 +346,19 @@ async function decryptData(encryptedData, key) {
   );
   const decoder = new TextDecoder();
   return JSON.parse(decoder.decode(decryptedContent));
+}
+
+function popoutCodebookWindow() {
+  chrome.windows.create({
+    url: chrome.runtime.getURL("html/popout.html"),
+    type: "popup",
+    width: 600,
+    height: 700
+  });
+}
+
+function loadCodebook() {
+  chrome.storage.local.get('codebook', function(result) {
+    codebook = result.codebook || {};
+  });
 }

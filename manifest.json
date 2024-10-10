@@ -14,7 +14,8 @@
     ],
     "host_permissions": [
       "https://discord.com/*",
-      "https://raw.githubusercontent.com/*"
+      "https://raw.githubusercontent.com/*",
+      "https://element.io/*"
     ],
     "background": {
       "service_worker": "js/background.js"
@@ -30,8 +31,8 @@
     "options_page": "html/options.html",
     "content_scripts": [
       {
-        "matches": ["https://discord.com/*"],
-        "js": ["js/discord.js", "js/content.js"],
+        "matches": ["https://discord.com/*", "https://element.io/*"],
+        "js": ["js/discord.js", "js/content.js", "js/element.js"],
         "run_at": "document_idle"
       }
     ],
@@ -44,7 +45,9 @@
       {
         "resources": [
           "icons/*.png",
-          "fonts/*.ttf"
+          "fonts/*.ttf",
+          "html/popout.html",
+          "css/popout.css"
         ],
         "matches": ["https://discord.com/*"]
       }

@@ -67,7 +67,8 @@ async function exportCodebookWithSettings() {
         destructKeyword: items.destructKeyword,
         crypticPhrase: items.crypticPhrase,
         defaultDestructTime: items.defaultDestructTime,
-        showDestructTimer: items.showDestructTimer
+        showDestructTimer: items.showDestructTimer,
+        discordSelectors: items.discordSelectors
       };
 
       const useCodebookEncryption = items.useCodebookEncryption;
@@ -100,47 +101,87 @@ async function exportCodebookWithSettings() {
 }
 
 async function handleFileUpload(file) {
-  const reader = new FileReader();
-  reader.onload = async function(e) {
-    try {
-      const content = e.target.result;
-      let importedData;
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const content = e.target.result;
+            let importedData;
 
-      if (file.name.endsWith('.txt')) {
-        importedData = { codebook: parseTxtCodebook(content) };
-      } else if (file.name.endsWith('.json')) {
-        importedData = JSON.parse(content);
-      } else {
-        throw new Error('Unsupported file type');
-      }
+            if (file.name.endsWith('.json')) {
+                const jsonData = JSON.parse(content);
+                
+                if (jsonData.encrypted) {
+                    // Handle encrypted data
+                    const password = prompt("Please enter the password to decrypt the codebook:");
+                    if (!password) {
+                        showStatus('Decryption cancelled', true);
+                        return;
+                    }
+                    
+                    try {
+                        const decryptedData = await decryptCodebook(jsonData, password);
+                        importedData = JSON.parse(decryptedData);
+                    } catch (decryptError) {
+                        showStatus('Error decrypting codebook: ' + decryptError.message, true);
+                        return;
+                    }
+                } else {
+                    // Handle unencrypted JSON data
+                    importedData = jsonData;
+                }
 
-      if (importedData.encrypted) {
-        const password = prompt('Please enter the password to decrypt the imported codebook:');
-        if (!password) {
-          showStatus('Password is required for codebook decryption', true);
-          return;
+                // Update the codebook textarea
+                if (importedData.codebook) {
+                    document.getElementById("codebookText").value = formatCodebook(importedData.codebook);
+                }
+
+                // Update other settings if present in the imported data
+                if (importedData.settings) {
+                    updateSettingsFromImport(importedData.settings);
+                }
+            } else if (file.name.endsWith('.txt')) {
+                // Handle .txt files
+                importedData = { codebook: parseCodebookText(content) };
+                document.getElementById("codebookText").value = content;
+            } else {
+                throw new Error('Unsupported file type');
+            }
+
+            autoSaveCodebook();
+            showStatus('Codebook imported successfully!');
+            chrome.runtime.sendMessage({ action: 'codebookUpdated' });
+        } catch (error) {
+            showStatus('Error importing codebook: ' + error.message, true);
         }
-        const decryptedData = await decryptCodebook(importedData, password);
-        handleImportedData(decryptedData);
-      } else {
-        handleImportedData(importedData);
-      }
-    } catch (error) {
-      showStatus('Error processing imported file: ' + error.message, true);
-    }
-  };
-  reader.readAsText(file);
+    };
+    reader.readAsText(file);
 }
 
-function parseTxtCodebook(content) {
-  const lines = content.split('\n');
+function updateSettingsFromImport(settings) {
+    // Update various settings based on the imported data
+    for (const [key, value] of Object.entries(settings)) {
+        const element = document.getElementById(key);
+        if (element) {
+            if (element.type === 'checkbox') {
+                element.checked = value;
+            } else {
+                element.value = value;
+            }
+        }
+    }
+    // Save the updated settings
+    saveOptions(false);
+}
+
+function parseCodebookText(text) {
+  const lines = text.split('\n');
   const codebook = {};
-  lines.forEach(line => {
+  for (let line of lines) {
     const [key, value] = line.split(':').map(item => item.trim());
     if (key && value) {
       codebook[key] = value;
     }
-  });
+  }
   return codebook;
 }
 
@@ -181,6 +222,204 @@ function updatePhraseCount() {
     document.getElementById("codebookPhraseCount").textContent = `Phrases: ${phraseCount}`;
 }
 
+function saveDiscordSelectors() {
+  const selectors = {
+    chatArea: document.getElementById('chatAreaSelector').value,
+    messageElements: document.getElementById('messageElementsSelector').value,
+    contentElement: document.getElementById('contentElementSelector').value,
+    repliedTextPreview: document.getElementById('repliedTextPreviewSelector').value,
+    usernameElement: document.getElementById('usernameElementSelector').value,
+    timestampElement: document.getElementById('timestampElementSelector').value,
+    messageInput: document.getElementById('messageInputSelector').value
+  };
+
+  chrome.storage.local.set({ discordSelectors: selectors }, function() {
+    showStatus('Discord selectors saved');
+  });
+}
+
+function loadDiscordSelectors() {
+  chrome.storage.local.get('discordSelectors', function(result) {
+    const selectors = result.discordSelectors || {
+      chatArea: '[class^="chatContent_"]',
+      messageElements: '[id^="chat-messages-"]',
+      contentElement: '[id^="message-content-"]',
+      repliedTextPreview: '[class*="repliedTextPreview_"]',
+      usernameElement: '[class*="username_"]',
+      timestampElement: 'time',
+      messageInput: 'div[role="textbox"][data-slate-editor="true"]'
+    };
+
+    document.getElementById('chatAreaSelector').value = selectors.chatArea;
+    document.getElementById('messageElementsSelector').value = selectors.messageElements;
+    document.getElementById('contentElementSelector').value = selectors.contentElement;
+    document.getElementById('repliedTextPreviewSelector').value = selectors.repliedTextPreview;
+    document.getElementById('usernameElementSelector').value = selectors.usernameElement;
+    document.getElementById('timestampElementSelector').value = selectors.timestampElement;
+    document.getElementById('messageInputSelector').value = selectors.messageInput;
+  });
+}
+
+function resetDiscordSelectors() {
+  const defaultSelectors = {
+    chatArea: '[class^="chatContent_"]',
+    messageElements: '[id^="chat-messages-"]',
+    contentElement: '[id^="message-content-"]',
+    repliedTextPreview: '[class*="repliedTextPreview_"]',
+    usernameElement: '[class*="username_"]',
+    timestampElement: 'time',
+    messageInput: 'div[role="textbox"][data-slate-editor="true"]'
+  };
+
+  Object.keys(defaultSelectors).forEach(key => {
+    document.getElementById(`${key}Selector`).value = defaultSelectors[key];
+  });
+
+  saveDiscordSelectors();
+}
+
+// Modify the existing loadOptions function
+function loadOptions() {
+  chrome.storage.local.get(null, function(items) {
+    document.getElementById('codebookText').value = formatCodebook(items.codebook || {});
+    document.getElementById('messagesToLoad').value = items.messagesToLoad || 50;
+    document.getElementById('autoScroll').checked = items.autoScroll !== false;
+    document.getElementById('backgroundColor').value = items.backgroundColor || '#141422';
+    document.getElementById('inputBoxColor').value = items.inputBoxColor || '#1e1e3f';
+    document.getElementById('headerColor').value = items.headerColor || '#1a1a40';
+    document.getElementById('windowTransparency').value = items.windowTransparency || 90;
+    document.getElementById('urlInput').value = items.url || '';
+    document.getElementById('autoUpdate').checked = items.autoUpdate || false;
+    document.getElementById('autoSend').checked = items.autoSend !== false;
+    loadUserColors(items.userColors || []);
+    loadMutedUsers(items.mutedUsers || []);
+    document.getElementById('destructableMessages').checked = items.destructableMessages || false;
+    document.getElementById('destructKeyword').value = items.destructKeyword || '\\d ! d';
+    document.getElementById('defaultDestructTime').value = items.defaultDestructTime || 5;
+    document.getElementById('showDestructTimer').checked = items.showDestructTimer !== false;
+    document.getElementById('messageSpacing').value = items.messageSpacing || 5;
+    document.getElementById('crypticPhrase').value = items.crypticPhrase || '\\d ! d';
+    document.getElementById('messageBubbleColor').value = items.messageBubbleColor || '#1e1e3f';
+    document.getElementById('messageBubbleOpacity').value = items.messageBubbleOpacity || '70';
+    document.getElementById('caseInsensitiveEncryption').checked = items.caseInsensitiveEncryption || false;
+    document.getElementById('messageCheckInterval').value = items.messageCheckInterval || 5;
+    document.getElementById('useCodebookEncryption').checked = items.useCodebookEncryption || false;
+    document.getElementById('codebookPassword').value = items.codebookPassword || '';
+    document.getElementById('codebookPassword').disabled = !items.useCodebookEncryption;
+    
+    if (items.codebook) {
+      document.getElementById("codebookText").value = formatCodebook(items.codebook);
+      updatePhraseCount();
+    }
+
+    // Load Element selectors
+    document.getElementById('elementChatAreaSelector').value = items.elementSelectors?.chatArea || '.mx_RoomView_messagePanel';
+    document.getElementById('elementMessageElementsSelector').value = items.elementSelectors?.messageElements || '.mx_EventTile';
+    document.getElementById('elementContentElementSelector').value = items.elementSelectors?.contentElement || '.mx_EventTile_body';
+    document.getElementById('elementUsernameElementSelector').value = items.elementSelectors?.usernameElement || '.mx_Username_color1.mx_DisambiguatedProfile_displayName';
+    document.getElementById('elementTimestampElementSelector').value = items.elementSelectors?.timestampElement || '.mx_MessageTimestamp';
+    document.getElementById('elementMessageInputSelector').value = items.elementSelectors?.messageInput || '.mx_BasicMessageComposer_input';
+  });
+
+  loadDiscordSelectors();
+}
+
+// Modify the existing saveOptions function
+function saveOptions(showStatus = true) {
+    const options = {
+        messagesToLoad: document.getElementById('messagesToLoad').value,
+        autoScroll: document.getElementById('autoScroll').checked,
+        backgroundColor: document.getElementById('backgroundColor').value,
+        inputBoxColor: document.getElementById('inputBoxColor').value,
+        headerColor: document.getElementById('headerColor').value,
+        windowTransparency: document.getElementById('windowTransparency').value,
+        destructableMessages: document.getElementById('destructableMessages').checked,
+        destructKeyword: document.getElementById('destructKeyword').value,
+        crypticPhrase: document.getElementById('crypticPhrase').value,
+        defaultDestructTime: document.getElementById('defaultDestructTime').value,
+        showDestructTimer: document.getElementById('showDestructTimer').checked,
+        messageSpacing: document.getElementById('messageSpacing').value,
+        messageBubbleColor: document.getElementById('messageBubbleColor').value,
+        messageBubbleOpacity: document.getElementById('messageBubbleOpacity').value,
+        userColors: getUserColors(),
+        mutedUsers: getMutedUsers(),
+        autoSend: document.getElementById('autoSend').checked,
+        caseInsensitiveEncryption: document.getElementById('caseInsensitiveEncryption').checked,
+        messageCheckInterval: document.getElementById('messageCheckInterval').value,
+        useCodebookEncryption: document.getElementById('useCodebookEncryption').checked,
+        codebookPassword: document.getElementById('codebookPassword').value,
+    };
+
+    const elementSelectors = {
+        chatArea: document.getElementById('elementChatAreaSelector').value,
+        messageElements: document.getElementById('elementMessageElementsSelector').value,
+        contentElement: document.getElementById('elementContentElementSelector').value,
+        usernameElement: document.getElementById('elementUsernameElementSelector').value,
+        timestampElement: document.getElementById('elementTimestampElementSelector').value,
+        messageInput: document.getElementById('elementMessageInputSelector').value
+    };
+
+    chrome.storage.local.set({
+        ...options,
+        elementSelectors: elementSelectors
+    }, function() {
+        if (showStatus) {
+            showStatus('Options saved successfully!');
+        }
+        chrome.runtime.sendMessage({ action: 'optionsUpdated' });
+    });
+
+    saveDiscordSelectors();
+}
+
+// Modify the existing clearAllData function
+function clearAllData() {
+  if (confirm("Are you sure you want to clear all data and reset all values? This action cannot be undone.")) {
+    chrome.storage.local.clear(() => {
+      if (chrome.runtime.lastError) {
+        showStatus('Error clearing data: ' + chrome.runtime.lastError.message, true);
+      } else {
+        // Reset all input fields to their default values
+        document.getElementById('codebookText').value = '';
+        document.getElementById('messagesToLoad').value = '50';
+        document.getElementById('autoScroll').checked = true;
+        document.getElementById('backgroundColor').value = '#141422';
+        document.getElementById('inputBoxColor').value = '#1e1e3f';
+        document.getElementById('headerColor').value = '#1a1a40';
+        document.getElementById('windowTransparency').value = '90';
+        document.getElementById('urlInput').value = '';
+        document.getElementById('autoUpdate').checked = false;
+        document.getElementById('autoSend').checked = true;
+        document.getElementById('destructableMessages').checked = false;
+        document.getElementById('destructKeyword').value = '\\d ! d';
+        document.getElementById('defaultDestructTime').value = '5';
+        document.getElementById('showDestructTimer').checked = true;
+        document.getElementById('messageSpacing').value = '5';
+        document.getElementById('crypticPhrase').value = '\\d ! d';
+        document.getElementById('messageBubbleColor').value = '#1e1e3f';
+        document.getElementById('messageBubbleOpacity').value = '70';
+        document.getElementById('caseInsensitiveEncryption').checked = false;
+        document.getElementById('messageCheckInterval').value = '5';
+
+        // Reset codebook encryption settings
+        document.getElementById('useCodebookEncryption').checked = false;
+        document.getElementById('codebookPassword').value = '';
+        document.getElementById('codebookPassword').disabled = true;
+
+        // Clear user colors and muted users
+        document.getElementById('userColorContainer').innerHTML = '';
+        document.getElementById('mutedUsersContainer').innerHTML = '';
+
+        // Reset Discord selectors
+        resetDiscordSelectors();
+
+        showStatus('All data cleared and values reset successfully');
+        saveOptions();
+      }
+    });
+  }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   const codebookTextArea = document.getElementById("codebookText");
   const uploadBtn = document.getElementById("uploadBtn");
@@ -201,6 +440,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const exportCodebookTxtBtn = document.getElementById('exportCodebookTxt');
   const codebookSearch = document.getElementById('codebookSearch');
   const useCodebookEncryption = document.getElementById('useCodebookEncryption');
+  const codebookPassword = document.getElementById('codebookPassword');
 
   loadOptions();
 
@@ -284,6 +524,12 @@ document.addEventListener('DOMContentLoaded', function() {
   if (codebookTextArea) {
     originalCodebook = codebookTextArea.value;
   }
+
+  ['chatAreaSelector', 'messageElementsSelector', 'contentElementSelector', 'repliedTextPreviewSelector', 'usernameElementSelector', 'timestampElementSelector', 'messageInputSelector'].forEach(id => {
+    document.getElementById(id).addEventListener('change', saveDiscordSelectors);
+  });
+
+  document.getElementById('resetDiscordSelectors').addEventListener('click', resetDiscordSelectors);
 });
 
 function handleDragOver(e) {
@@ -349,138 +595,17 @@ function debounce(func, delay) {
 
 function autoSaveCodebook() {
   const codebookTextArea = document.getElementById("codebookText");
-  const lines = codebookTextArea.value.split('\n');
-  const updatedCodebook = {};
-  let errorLines = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    let line = lines[i].trim();
-    if (line) {
-      const [key, value] = line.split(':').map(item => item.trim());
-      if (key && value) {
-        updatedCodebook[key] = value;
-      } else {
-        errorLines.push(i + 1);
-      }
-    }
-  }
+  const updatedCodebook = parseCodebookText(codebookTextArea.value);
 
   chrome.storage.local.set({ codebook: updatedCodebook }, function() {
     if (chrome.runtime.lastError) {
       showStatus('Error saving codebook: ' + chrome.runtime.lastError.message, true);
     } else {
-      originalCodebook = codebookTextArea.value; // Update the originalCodebook
-      if (errorLines.length > 0) {
-        showStatus('Codebook saved with errors. Please check lines: ' + errorLines.join(', '), true);
-      } else {
-        showStatus('Codebook saved successfully!');
-        chrome.runtime.sendMessage({ action: 'codebookUpdated' });
-      }
+      showStatus('Codebook saved successfully!');
+      chrome.runtime.sendMessage({ action: 'codebookUpdated' });
+      updatePhraseCount();
     }
   });
-}
-
-function saveOptions(showMessage = true) {
-    const options = {
-        messagesToLoad: document.getElementById('messagesToLoad').value,
-        autoScroll: document.getElementById('autoScroll').checked,
-        backgroundColor: document.getElementById('backgroundColor').value,
-        inputBoxColor: document.getElementById('inputBoxColor').value,
-        headerColor: document.getElementById('headerColor').value,
-        windowTransparency: document.getElementById('windowTransparency').value,
-        destructableMessages: document.getElementById('destructableMessages').checked,
-        destructKeyword: document.getElementById('destructKeyword').value,
-        crypticPhrase: document.getElementById('crypticPhrase').value,
-        defaultDestructTime: document.getElementById('defaultDestructTime').value,
-        showDestructTimer: document.getElementById('showDestructTimer').checked,
-        messageSpacing: document.getElementById('messageSpacing').value,
-        messageBubbleColor: document.getElementById('messageBubbleColor').value,
-        messageBubbleOpacity: document.getElementById('messageBubbleOpacity').value,
-        userColors: getUserColors(),
-        mutedUsers: getMutedUsers(),
-        autoSend: document.getElementById('autoSend').checked,
-        caseInsensitiveEncryption: document.getElementById('caseInsensitiveEncryption').checked,
-        messageCheckInterval: document.getElementById('messageCheckInterval').value,
-        useCodebookEncryption: document.getElementById('useCodebookEncryption').checked,
-        codebookPassword: document.getElementById('codebookPassword').value,
-    };
-
-    chrome.storage.local.set(options, function() {
-        if (showMessage) {
-            showStatus('Options saved');
-        }
-        // Notify background script to update the message check interval
-        chrome.runtime.sendMessage({ action: 'updateMessageCheckInterval' });
-    });
-}
-
-function loadOptions() {
-  chrome.storage.local.get([
-    'codebook',
-    'messagesToLoad',
-    'autoScroll',
-    'backgroundColor',
-    'inputBoxColor',
-    'headerColor',
-    'windowTransparency',
-    'userColors',
-    'url',
-    'autoUpdate',
-    'autoSend',
-    'mutedUsers',
-    'destructableMessages',
-    'destructKeyword',
-    'defaultDestructTime',
-    'showDestructTimer',
-    'messageSpacing',
-    'crypticPhrase',
-    'messageBubbleColor',
-    'messageBubbleOpacity',
-    'caseInsensitiveEncryption',
-    'messageCheckInterval',
-    'useCodebookEncryption',
-    'codebookPassword',
-  ], function(items) {
-    document.getElementById('codebookText').value = formatCodebook(items.codebook || {});
-    document.getElementById('messagesToLoad').value = items.messagesToLoad || 50;
-    document.getElementById('autoScroll').checked = items.autoScroll !== false;
-    document.getElementById('backgroundColor').value = items.backgroundColor || '#141422';
-    document.getElementById('inputBoxColor').value = items.inputBoxColor || '#1e1e3f';
-    document.getElementById('headerColor').value = items.headerColor || '#1a1a40';
-    document.getElementById('windowTransparency').value = items.windowTransparency || 90;
-    document.getElementById('urlInput').value = items.url || '';
-    document.getElementById('autoUpdate').checked = items.autoUpdate || false;
-    document.getElementById('autoSend').checked = items.autoSend !== false;
-    loadUserColors(items.userColors || []);
-    loadMutedUsers(items.mutedUsers || []);
-    document.getElementById('destructableMessages').checked = items.destructableMessages || false;
-    document.getElementById('destructKeyword').value = items.destructKeyword || '\\d ! d';
-    document.getElementById('defaultDestructTime').value = items.defaultDestructTime || 5;
-    document.getElementById('showDestructTimer').checked = items.showDestructTimer !== false;
-    document.getElementById('messageSpacing').value = items.messageSpacing || 5;
-    document.getElementById('crypticPhrase').value = items.crypticPhrase || '\\d ! d';
-    document.getElementById('messageBubbleColor').value = items.messageBubbleColor || '#1e1e3f';
-    document.getElementById('messageBubbleOpacity').value = items.messageBubbleOpacity || '70';
-    document.getElementById('caseInsensitiveEncryption').checked = items.caseInsensitiveEncryption || false;
-    document.getElementById('messageCheckInterval').value = items.messageCheckInterval || 5;
-    document.getElementById('useCodebookEncryption').checked = items.useCodebookEncryption || false;
-    document.getElementById('codebookPassword').value = items.codebookPassword || '';
-    document.getElementById('codebookPassword').disabled = !items.useCodebookEncryption;
-    updatePhraseCount();
-  });
-
-  chrome.storage.local.get('useCodebookEncryption', function(result) {
-    const useCodebookEncryption = document.getElementById('useCodebookEncryption');
-    if (useCodebookEncryption) {
-      useCodebookEncryption.checked = result.useCodebookEncryption || false;
-      document.getElementById('codebookPassword').disabled = !useCodebookEncryption.checked;
-      document.getElementById('exportCodebookTxt').disabled = useCodebookEncryption.checked;
-    }
-  });
-}
-
-function formatCodebook(codebook) {
-  return Object.entries(codebook).map(([key, value]) => `${key} : ${value}`).join('\n');
 }
 
 function getUserColors() {
@@ -649,46 +774,6 @@ function autoSave() {
   });
 }
 
-function clearAllData() {
-  if (confirm("Are you sure you want to clear all data and reset all values? This action cannot be undone.")) {
-    chrome.storage.local.clear(() => {
-      if (chrome.runtime.lastError) {
-        showStatus('Error clearing data: ' + chrome.runtime.lastError.message, true);
-      } else {
-        // Reset all input fields to their default values
-        document.getElementById('codebookText').value = '';
-        document.getElementById('messagesToLoad').value = '50';
-        document.getElementById('autoScroll').checked = true;
-        document.getElementById('backgroundColor').value = '#141422';
-        document.getElementById('inputBoxColor').value = '#1e1e3f';
-        document.getElementById('headerColor').value = '#1a1a40';
-        document.getElementById('windowTransparency').value = '90';
-        document.getElementById('urlInput').value = '';
-        document.getElementById('autoUpdate').checked = false;
-        document.getElementById('autoSend').checked = true;
-        document.getElementById('destructableMessages').checked = false;
-        document.getElementById('destructKeyword').value = '\\d ! d';
-        document.getElementById('defaultDestructTime').value = '5';
-        document.getElementById('showDestructTimer').checked = true;
-        document.getElementById('messageSpacing').value = '5';
-        document.getElementById('crypticPhrase').value = '\\d ! d';
-        document.getElementById('messageBubbleColor').value = '#1e1e3f';
-        document.getElementById('messageBubbleOpacity').value = '70';
-        document.getElementById('caseInsensitiveEncryption').checked = false;
-        document.getElementById('messageCheckInterval').value = '5';
-
-        // Reset codebook encryption settings
-        document.getElementById('useCodebookEncryption').checked = false;
-        document.getElementById('codebookPassword').value = '';
-        document.getElementById('codebookPassword').disabled = true;
-
-        // Clear user colors and muted users
-        document.getElementById('userColorContainer').innerHTML = '';
-        document.getElementById('mutedUsersContainer').innerHTML = '';
-
-        showStatus('All data cleared and values reset successfully');
-        saveOptions();
-      }
-    });
-  }
+function formatCodebook(codebook) {
+  return Object.entries(codebook).map(([key, value]) => `${key} : ${value}`).join('\n');
 }

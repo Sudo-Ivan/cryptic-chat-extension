@@ -372,7 +372,6 @@ CrypticChat.updateCrypticChatWindow = function(decryptedTexts) {
                 // Remove the destruction keyword from the displayed message
                 messageElement.textContent = text.replace(destructMatch[0], '').trim();
 
-                // Add timer if enabled
                 if (CrypticChat.showDestructTimer) {
                     const timerElement = document.createElement('span');
                     timerElement.className = 'destruct-timer';
@@ -503,7 +502,7 @@ CrypticChat.encryptAndSend = function(message) {
             const destructMatch = message.match(destructRegex);
             if (destructMatch) {
                 const minutes = destructMatch[1] || defaultDestructTime;
-                encryptedMessage = encryptedMessage.replace(destructMatch[0], `${crypticPhrase}${minutes}//`);
+                encryptedMessage = encryptedMessage.replace(destructMatch[0], `${crypticPhrase}${minutes}`);
             }
         }
 
@@ -545,7 +544,8 @@ CrypticChat.init = function() {
         'messageBubbleOpacity',
         'userColors',
         'codebook',
-        'messageCheckInterval'  // Add this line
+        'messageCheckInterval',
+        'discordSelectors'
     ], function(items) {
         CrypticChat.messagesToLoad = items.messagesToLoad || 50;
         CrypticChat.autoScroll = items.autoScroll !== false;
@@ -563,7 +563,16 @@ CrypticChat.init = function() {
         CrypticChat.messageBubbleOpacity = items.messageBubbleOpacity || 70;
         CrypticChat.userColors = items.userColors || [];
         CrypticChat.codebook = items.codebook || {};
-        CrypticChat.messageCheckInterval = items.messageCheckInterval || 5;  // Add this line
+        CrypticChat.messageCheckInterval = items.messageCheckInterval || 5;
+        CrypticChat.discordSelectors = items.discordSelectors || {
+            chatArea: '[class^="chatContent_"]',
+            messageElements: '[id^="chat-messages-"]',
+            contentElement: '[id^="message-content-"]',
+            repliedTextPreview: '[class*="repliedTextPreview_"]',
+            usernameElement: '[class*="username_"]',
+            timestampElement: 'time',
+            messageInput: 'div[role="textbox"][data-slate-editor="true"]'
+        };
 
         CrypticChat.updateAllStyles();
         CrypticChat.reloadMessages();
@@ -576,7 +585,6 @@ CrypticChat.init = function() {
     });
 };
 
-// Add a listener for storage changes to update the interval in real-time
 chrome.storage.onChanged.addListener(function(changes, namespace) {
     if (namespace === 'local' && changes.messageCheckInterval) {
         CrypticChat.messageCheckInterval = changes.messageCheckInterval.newValue;
@@ -604,6 +612,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             }
             CrypticChat.messageCheckIntervalId = setInterval(CrypticChat.reloadMessages, CrypticChat.messageCheckInterval * 1000);
         });
+    } else if (request.action === 'updateDiscordSelectors') {
+        chrome.storage.local.get('discordSelectors', (result) => {
+            CrypticChat.discordSelectors = result.discordSelectors || {
+                chatArea: '[class^="chatContent_"]',
+                messageElements: '[id^="chat-messages-"]',
+                contentElement: '[id^="message-content-"]',
+                repliedTextPreview: '[class*="repliedTextPreview_"]',
+                usernameElement: '[class*="username_"]',
+                timestampElement: 'time',
+                messageInput: 'div[role="textbox"][data-slate-editor="true"]'
+            };
+            CrypticChat.reloadMessages();
+        });
     }
 });
 
@@ -613,7 +634,7 @@ const chatObserver = new MutationObserver((mutations) => {
     for (let mutation of mutations) {
         if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
             for (let node of mutation.addedNodes) {
-                if (node.nodeType === Node.ELEMENT_NODE && node.id.startsWith('chat-messages-')) {
+                if (node.nodeType === Node.ELEMENT_NODE && node.matches(CrypticChat.discordSelectors.messageElements)) {
                     CrypticChat.reloadMessages();
                     return;
                 }
@@ -622,12 +643,11 @@ const chatObserver = new MutationObserver((mutations) => {
     }
 });
 
-const chatArea = document.querySelector('[class^="chatContent_"]');
+const chatArea = document.querySelector(CrypticChat.discordSelectors.chatArea);
 if (chatArea) {
     chatObserver.observe(chatArea, { childList: true, subtree: true });
 }
 
-// Add a new observer for channel switches
 const channelSwitchObserver = new MutationObserver((mutations) => {
     for (let mutation of mutations) {
         if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
@@ -646,7 +666,6 @@ if (appMount) {
     channelSwitchObserver.observe(appMount, { childList: true, subtree: true });
 }
 
-// Add a listener for storage changes to update options in real-time
 chrome.storage.onChanged.addListener(function(changes, namespace) {
     if (namespace === 'local') {
         CrypticChat.applyOptions();

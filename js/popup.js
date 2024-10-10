@@ -67,4 +67,8 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     }
   });
+
+  document.getElementById("popoutCodebook").addEventListener("click", () => {
+    chrome.runtime.sendMessage({ action: "popoutCodebook" });
+  });
 });
