@@ -7,8 +7,21 @@ CrypticChat.escapeRegExp = function(string) {
 CrypticChat.Discord = {
     discordParse: function(codebook) {
         return new Promise((resolve, reject) => {
-            chrome.storage.local.get(['mutedUsers', 'discordSelectors'], (result) => {
+            chrome.storage.local.get([
+                'mutedUsers', 
+                'discordSelectors', 
+                'caseInsensitiveEncryption', 
+                'crypticPhrase',
+                'destructableMessages',
+                'showDestructTimer',
+                'messagesToLoad'
+            ], (result) => {
                 const mutedUsers = result.mutedUsers || [];
+                const caseInsensitiveEncryption = result.caseInsensitiveEncryption || false;
+                const crypticPhrase = result.crypticPhrase || '\\d ! d';
+                const destructableMessages = result.destructableMessages || false;
+                const showDestructTimer = result.showDestructTimer !== false;
+                const messagesToLoad = result.messagesToLoad || 50;
                 const selectors = result.discordSelectors || {
                     chatArea: '[class^="chatContent_"]',
                     messageElements: '[id^="chat-messages-"]',
@@ -29,7 +42,7 @@ CrypticChat.Discord = {
                 const decryptionPromises = [];
 
                 for (let i = messageElements.length - 1; i >= 0; i--) {
-                    decryptionPromises.push(this.decryptElement(messageElements[i], codebook, selectors));
+                    decryptionPromises.push(this.decryptElement(messageElements[i], codebook, selectors, caseInsensitiveEncryption, crypticPhrase, destructableMessages, showDestructTimer));
                 }
 
                 Promise.all(decryptionPromises).then(decryptedResults => {
@@ -38,7 +51,7 @@ CrypticChat.Discord = {
                             const username = decryptedText.split(':')[0].trim();
                             if (!mutedUsers.includes(username)) {
                                 decryptedTexts.unshift(decryptedText);
-                                if (decryptedTexts.length >= 50) return;
+                                if (decryptedTexts.length >= messagesToLoad) return;
                             }
                         }
                     });

@@ -348,6 +348,8 @@ function saveOptions(showStatus = true) {
         messageCheckInterval: document.getElementById('messageCheckInterval').value,
         useCodebookEncryption: document.getElementById('useCodebookEncryption').checked,
         codebookPassword: document.getElementById('codebookPassword').value,
+        url: document.getElementById('urlInput').value,
+        autoUpdate: document.getElementById('autoUpdate').checked
     };
 
     const elementSelectors = {
@@ -359,17 +361,26 @@ function saveOptions(showStatus = true) {
         messageInput: document.getElementById('elementMessageInputSelector').value
     };
 
+    const discordSelectors = {
+        chatArea: document.getElementById('chatAreaSelector').value,
+        messageElements: document.getElementById('messageElementsSelector').value,
+        contentElement: document.getElementById('contentElementSelector').value,
+        repliedTextPreview: document.getElementById('repliedTextPreviewSelector').value,
+        usernameElement: document.getElementById('usernameElementSelector').value,
+        timestampElement: document.getElementById('timestampElementSelector').value,
+        messageInput: document.getElementById('messageInputSelector').value
+    };
+
     chrome.storage.local.set({
         ...options,
-        elementSelectors: elementSelectors
+        elementSelectors: elementSelectors,
+        discordSelectors: discordSelectors
     }, function() {
         if (showStatus) {
             showStatus('Options saved successfully!');
         }
         chrome.runtime.sendMessage({ action: 'optionsUpdated' });
     });
-
-    saveDiscordSelectors();
 }
 
 // Modify the existing clearAllData function
@@ -418,6 +429,14 @@ function clearAllData() {
       }
     });
   }
+}
+
+// Add this function to handle color input changes
+function handleColorChange(event) {
+  const colorInput = event.target;
+  const colorValue = colorInput.value;
+  console.log(`Color changed: ${colorInput.id} = ${colorValue}`);
+  autoSave();
 }
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -499,13 +518,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
   document.getElementById('saveBtn').addEventListener('click', () => saveOptions(true));
 
-  ['messageBubbleColor', 'messageBubbleOpacity', 'destructableMessages', 'destructKeyword', 'crypticPhrase', 'defaultDestructTime', 'showDestructTimer'].forEach(id => {
-    document.getElementById(id).addEventListener('change', debounce(autoSave, 500));
+  // Add event listeners for color inputs
+  ['backgroundColor', 'inputBoxColor', 'headerColor', 'messageBubbleColor'].forEach(id => {
+    const colorInput = document.getElementById(id);
+    if (colorInput) {
+      colorInput.addEventListener('input', handleColorChange);
+      colorInput.addEventListener('change', handleColorChange);
+    }
   });
 
-  ['messagesToLoad', 'autoScroll', 'backgroundColor', 'inputBoxColor', 'headerColor', 'windowTransparency', 'autoSend', 'messageSpacing', 'messageBubbleColor', 'messageBubbleOpacity', 'messageCheckInterval'].forEach(id => {
-    document.getElementById(id).addEventListener('change', debounce(autoSave, 500));
-    document.getElementById(id).addEventListener('input', debounce(autoSave, 500));
+  // Update existing listeners
+  ['messageBubbleOpacity', 'destructableMessages', 'destructKeyword', 'crypticPhrase', 'defaultDestructTime', 'showDestructTimer', 'messagesToLoad', 'autoScroll', 'windowTransparency', 'autoSend', 'messageSpacing', 'messageCheckInterval'].forEach(id => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.addEventListener('change', debounce(autoSave, 500));
+      element.addEventListener('input', debounce(autoSave, 500));
+    }
   });
 
   document.getElementById('caseInsensitiveEncryption').addEventListener('change', saveOptions);
@@ -763,15 +791,19 @@ function resetTheme() {
 
 function autoSave() {
   saveOptions(false);
-  document.getElementById('autoSaveStatus').textContent = 'Auto-saved';
+  const autoSaveStatus = document.getElementById('autoSaveStatus');
+  autoSaveStatus.textContent = 'Auto-saving...';
+  autoSaveStatus.style.color = 'orange';
+  
   setTimeout(() => {
-    document.getElementById('autoSaveStatus').textContent = '';
-  }, 2000);
+    autoSaveStatus.textContent = 'Auto-saved';
+    autoSaveStatus.style.color = 'green';
+    setTimeout(() => {
+      autoSaveStatus.textContent = '';
+    }, 2000);
+  }, 500);
 
-  // Send a message to the content script to update styles
-  chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-    chrome.tabs.sendMessage(tabs[0].id, {action: "updateStyles"});
-  });
+  chrome.runtime.sendMessage({action: "updateStyles"});
 }
 
 function formatCodebook(codebook) {

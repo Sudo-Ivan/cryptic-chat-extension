@@ -45,11 +45,9 @@
       {
         "resources": [
           "icons/*.png",
-          "fonts/*.ttf",
-          "html/popout.html",
-          "css/popout.css"
+          "fonts/*.ttf"
         ],
-        "matches": ["https://discord.com/*"]
+        "matches": ["https://discord.com/*", "https://element.io/*"]
       }
     ],
     "declarative_net_request": {
