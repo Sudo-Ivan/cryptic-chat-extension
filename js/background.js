@@ -138,6 +138,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const interval = result.messageCheckInterval || 5;
       startMessageCheckInterval(interval);
     });
+  } else if (request.action === 'updateStyles') {
+    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+      if (tabs[0]) {
+        chrome.tabs.sendMessage(tabs[0].id, {action: "updateAllStyles"});
+      }
+    });
   } else if (isValidMessage(request)) {
     processMessage(request, sendResponse);
     return true;
@@ -161,7 +167,9 @@ function processMessage(request, sendResponse) {
     'caseInsensitiveEncryption',
     'destructableMessages',
     'destructKeyword',
-    'defaultDestructTime'
+    'defaultDestructTime',
+    'showDestructTimer',
+    'autoSend'
   ], function(result) {
     const codebook = result.codebook || {};
     const mutedUsers = result.mutedUsers || [];
@@ -170,6 +178,8 @@ function processMessage(request, sendResponse) {
     const destructableMessages = result.destructableMessages || false;
     const destructKeyword = result.destructKeyword || '\\d ! d';
     const defaultDestructTime = result.defaultDestructTime || 5;
+    const showDestructTimer = result.showDestructTimer !== false;
+    const autoSend = result.autoSend !== false;
 
     let processedMessage = request.message;
     
@@ -346,15 +356,6 @@ async function decryptData(encryptedData, key) {
   );
   const decoder = new TextDecoder();
   return JSON.parse(decoder.decode(decryptedContent));
-}
-
-function popoutCodebookWindow() {
-  chrome.windows.create({
-    url: chrome.runtime.getURL("html/popout.html"),
-    type: "popup",
-    width: 600,
-    height: 700
-  });
 }
 
 function loadCodebook() {

@@ -1,5 +1,26 @@
 window.CrypticChat = window.CrypticChat || {};
 
+CrypticChat.updateAllStyles = function() {
+    console.log('Updating all styles');
+    const crypticChatWindow = document.getElementById('crypticChatWindow');
+    if (crypticChatWindow) {
+        console.log('Cryptic Chat window found, applying styles');
+        const header = crypticChatWindow.querySelector('.cryptic-chat-header');
+        const input = crypticChatWindow.querySelector('.cryptic-chat-input');
+        const content = crypticChatWindow.querySelector('.cryptic-chat-content');
+
+        crypticChatWindow.style.backgroundColor = `rgba(15, 15, 35, ${CrypticChat.windowTransparency / 100})`;
+        if (header) header.style.backgroundColor = CrypticChat.headerColor;
+        if (input) input.style.backgroundColor = CrypticChat.inputBoxColor;
+        if (content) content.style.backgroundColor = CrypticChat.backgroundColor;
+
+        CrypticChat.applyMessageSpacing();
+        CrypticChat.applyMessageBubbleStyle();
+    } else {
+        console.log('Cryptic Chat window not found');
+    }
+};
+
 CrypticChat.escapeRegExp = function(string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 };
@@ -204,6 +225,7 @@ CrypticChat.createCrypticChatWindow = function() {
     CrypticChat.addIconsToWindow(crypticChatWindow);
     CrypticChat.setupInputHandler(inputArea);
 
+    CrypticChat.updateAllStyles();
     return crypticChatWindow;
 };
 
@@ -545,7 +567,10 @@ CrypticChat.init = function() {
         'userColors',
         'codebook',
         'messageCheckInterval',
-        'discordSelectors'
+        'discordSelectors',
+        'caseInsensitiveEncryption',
+        'mutedUsers',
+        'autoSend'
     ], function(items) {
         CrypticChat.messagesToLoad = items.messagesToLoad || 50;
         CrypticChat.autoScroll = items.autoScroll !== false;
@@ -564,6 +589,9 @@ CrypticChat.init = function() {
         CrypticChat.userColors = items.userColors || [];
         CrypticChat.codebook = items.codebook || {};
         CrypticChat.messageCheckInterval = items.messageCheckInterval || 5;
+        CrypticChat.caseInsensitiveEncryption = items.caseInsensitiveEncryption || false;
+        CrypticChat.mutedUsers = items.mutedUsers || [];
+        CrypticChat.autoSend = items.autoSend !== false;
         CrypticChat.discordSelectors = items.discordSelectors || {
             chatArea: '[class^="chatContent_"]',
             messageElements: '[id^="chat-messages-"]',
@@ -672,20 +700,3 @@ chrome.storage.onChanged.addListener(function(changes, namespace) {
         CrypticChat.updateAllStyles();
     }
 });
-
-CrypticChat.updateAllStyles = function() {
-    const crypticChatWindow = document.getElementById('crypticChatWindow');
-    if (crypticChatWindow) {
-        const header = crypticChatWindow.querySelector('.cryptic-chat-header');
-        const input = crypticChatWindow.querySelector('.cryptic-chat-input');
-        const content = crypticChatWindow.querySelector('.cryptic-chat-content');
-
-        crypticChatWindow.style.backgroundColor = `rgba(15, 15, 35, ${CrypticChat.windowTransparency / 100})`;
-        if (header) header.style.backgroundColor = CrypticChat.headerColor;
-        if (input) input.style.backgroundColor = CrypticChat.inputBoxColor;
-        if (content) content.style.backgroundColor = CrypticChat.backgroundColor;
-
-        CrypticChat.applyMessageSpacing();
-        CrypticChat.applyMessageBubbleStyle();
-    }
-};
