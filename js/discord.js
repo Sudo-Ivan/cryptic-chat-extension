@@ -5,6 +5,11 @@ CrypticChat.escapeRegExp = function(string) {
 };
 
 CrypticChat.Discord = {
+
+    init: function() {
+    },
+
+    // Parsing Messages
     discordParse: function(codebook) {
         return new Promise((resolve, reject) => {
             chrome.storage.local.get([
@@ -31,6 +36,7 @@ CrypticChat.Discord = {
                     timestampElement: 'time',
                     messageInput: 'div[role="textbox"][data-slate-editor="true"]'
                 };
+
                 let decryptedTexts = [];
                 const chatArea = document.querySelector(selectors.chatArea);
                 if (!chatArea) {
@@ -42,7 +48,17 @@ CrypticChat.Discord = {
                 const decryptionPromises = [];
 
                 for (let i = messageElements.length - 1; i >= 0; i--) {
-                    decryptionPromises.push(this.decryptElement(messageElements[i], codebook, selectors, caseInsensitiveEncryption, crypticPhrase, destructableMessages, showDestructTimer));
+                    decryptionPromises.push(
+                        this.decryptElement(
+                            messageElements[i], 
+                            codebook, 
+                            selectors, 
+                            caseInsensitiveEncryption, 
+                            crypticPhrase, 
+                            destructableMessages, 
+                            showDestructTimer
+                        )
+                    );
                 }
 
                 Promise.all(decryptionPromises).then(decryptedResults => {
@@ -64,6 +80,7 @@ CrypticChat.Discord = {
         });
     },
 
+    // Decrypting Elements
     decryptElement: function(messageElement, codebook, selectors) {
         return new Promise((resolve) => {
             try {
@@ -109,7 +126,6 @@ CrypticChat.Discord = {
                     }
 
                     if (isDecrypted) {
-                        // Check for destructible message
                         const destructRegex = new RegExp(`${CrypticChat.escapeRegExp(crypticPhrase)}(\\d+)`, caseInsensitiveEncryption ? 'gi' : 'g');
                         const destructMatch = decryptedText.match(destructRegex);
                         
@@ -118,14 +134,13 @@ CrypticChat.Discord = {
                             const timestamp = messageElement.querySelector(selectors.timestampElement).dateTime;
                             const messageTime = new Date(timestamp).getTime();
                             const currentTime = new Date().getTime();
-                            const timeDiff = (currentTime - messageTime) / (1000 * 60); // difference in minutes
+                            const timeDiff = (currentTime - messageTime) / (1000 * 60);
 
                             if (timeDiff >= destructMinutes) {
-                                resolve(null); // Message should be destroyed
+                                resolve(null);
                                 return;
                             }
 
-                            // Remove the destruction keyword from the message
                             decryptedText = decryptedText.replace(destructMatch[0], '').trim();
                         }
 
@@ -169,6 +184,7 @@ CrypticChat.Discord = {
         });
     },
 
+    // Setting Messages
     setDiscordMessage: function(message, sendMessage = false) {
         chrome.storage.local.get('discordSelectors', (result) => {
             const selectors = result.discordSelectors || {
@@ -225,12 +241,7 @@ CrypticChat.Discord = {
                 messageInput.dispatchEvent(enterEvent);
             }
         });
-    },
-
-    init: function() {
-        // Any initialization code for Discord-specific functionality
     }
 };
 
-// Initialize Discord-specific functionality
 CrypticChat.Discord.init();

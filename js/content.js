@@ -1,5 +1,6 @@
 window.CrypticChat = window.CrypticChat || {};
 
+// Style Management
 CrypticChat.updateAllStyles = function() {
     console.log('Updating all styles');
     const crypticChatWindow = document.getElementById('crypticChatWindow');
@@ -19,10 +20,6 @@ CrypticChat.updateAllStyles = function() {
     } else {
         console.log('Cryptic Chat window not found');
     }
-};
-
-CrypticChat.escapeRegExp = function(string) {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 };
 
 CrypticChat.createCrypticChatWindow = function() {
@@ -229,6 +226,121 @@ CrypticChat.createCrypticChatWindow = function() {
     return crypticChatWindow;
 };
 
+// Initialization
+CrypticChat.init = function() {
+    chrome.storage.local.get([
+        'messagesToLoad',
+        'autoScroll',
+        'backgroundColor',
+        'inputBoxColor',
+        'headerColor',
+        'windowTransparency',
+        'destructableMessages',
+        'destructKeyword',
+        'crypticPhrase',
+        'defaultDestructTime',
+        'showDestructTimer',
+        'messageSpacing',
+        'messageBubbleColor',
+        'messageBubbleOpacity',
+        'userColors',
+        'codebook',
+        'messageCheckInterval',
+        'discordSelectors',
+        'caseInsensitiveEncryption',
+        'mutedUsers',
+        'autoSend'
+    ], function(items) {
+        CrypticChat.discordSelectors = items.discordSelectors || {
+            chatArea: '[class^="chatContent_"]',
+            messageElements: '[id^="chat-messages-"]',
+            contentElement: '[id^="message-content-"]',
+            repliedTextPreview: '[class*="repliedTextPreview_"]',
+            usernameElement: '[class*="username_"]',
+            timestampElement: 'time',
+            messageInput: 'div[role="textbox"][data-slate-editor="true"]'
+        };
+
+        CrypticChat.userColors = items.userColors || [];
+
+        CrypticChat.updateAllStyles();
+        CrypticChat.reloadMessages();
+
+        if (CrypticChat.messageCheckIntervalId) {
+            clearInterval(CrypticChat.messageCheckIntervalId);
+        }
+        CrypticChat.messageCheckIntervalId = setInterval(CrypticChat.reloadMessages, CrypticChat.messageCheckInterval * 1000);
+
+        CrypticChat.setupObservers();
+    });
+};
+
+CrypticChat.setupObservers = function() {
+    const chatObserver = new MutationObserver((mutations) => {
+        for (let mutation of mutations) {
+            if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                for (let node of mutation.addedNodes) {
+                    if (node.nodeType === Node.ELEMENT_NODE && node.matches(CrypticChat.discordSelectors.messageElements)) {
+                        CrypticChat.reloadMessages();
+                        return;
+                    }
+                }
+            }
+        }
+    });
+
+    const chatArea = document.querySelector(CrypticChat.discordSelectors.chatArea);
+    if (chatArea) {
+        chatObserver.observe(chatArea, { childList: true, subtree: true });
+    }
+
+    const channelSwitchObserver = new MutationObserver((mutations) => {
+        for (let mutation of mutations) {
+            if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                for (let node of mutation.addedNodes) {
+                    if (node.nodeType === Node.ELEMENT_NODE && node.classList.contains('chat-3bRxxu')) {
+                        CrypticChat.reloadMessages();
+                        return;
+                    }
+                }
+            }
+        }
+    });
+
+    const appMount = document.querySelector('#app-mount');
+    if (appMount) {
+        channelSwitchObserver.observe(appMount, { childList: true, subtree: true });
+    }
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+    CrypticChat.init();
+});
+
+CrypticChat.applyMessageSpacing = function() {
+    const messagesContainer = document.querySelector('.cryptic-chat-content');
+    if (messagesContainer) {
+        messagesContainer.style.setProperty('--message-spacing', `${CrypticChat.messageSpacing}px`);
+    }
+};
+
+CrypticChat.applyMessageBubbleStyle = function() {
+    const crypticChatWindow = document.getElementById('crypticChatWindow');
+    if (crypticChatWindow) {
+        const style = crypticChatWindow.querySelector('style') || document.createElement('style');
+        style.textContent = `
+            .cryptic-chat-message {
+                background-color: ${CrypticChat.messageBubbleColor}${Math.round(CrypticChat.messageBubbleOpacity * 2.55).toString(16).padStart(2, '0')};
+            }
+        `;
+        crypticChatWindow.appendChild(style);
+    }
+};
+
+// Window Management
+
+
+// Draggable Functionality
 CrypticChat.makeDraggable = function(element, handle) {
     let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
     handle.onmousedown = dragMouseDown;
@@ -259,6 +371,7 @@ CrypticChat.makeDraggable = function(element, handle) {
     }
 };
 
+// Apply Options from Storage
 CrypticChat.applyOptions = function(isInitialLoad = false) {
     chrome.storage.local.get([
         'messagesToLoad',
@@ -305,31 +418,11 @@ CrypticChat.applyOptions = function(isInitialLoad = false) {
     });
 };
 
-CrypticChat.applyMessageSpacing = function() {
-    const messagesContainer = document.querySelector('.cryptic-chat-content');
-    if (messagesContainer) {
-        messagesContainer.style.setProperty('--message-spacing', `${CrypticChat.messageSpacing}px`);
-    }
-};
-
-CrypticChat.applyMessageBubbleStyle = function() {
-    const crypticChatWindow = document.getElementById('crypticChatWindow');
-    if (crypticChatWindow) {
-        const style = crypticChatWindow.querySelector('style') || document.createElement('style');
-        style.textContent = `
-            .cryptic-chat-message {
-                background-color: ${CrypticChat.messageBubbleColor}${Math.round(CrypticChat.messageBubbleOpacity * 2.55).toString(16).padStart(2, '0')};
-            }
-        `;
-        crypticChatWindow.appendChild(style);
-    }
-};
-
+// Update Messages in Chat Window
 CrypticChat.updateCrypticChatWindow = function(decryptedTexts) {
     const crypticChatWindow = CrypticChat.createCrypticChatWindow();
     const messagesContainer = crypticChatWindow.querySelector('.cryptic-chat-content');
     
-    // Clear the messages container if no decrypted texts
     if (decryptedTexts.length === 0) {
         messagesContainer.innerHTML = '';
         return;
@@ -341,7 +434,6 @@ CrypticChat.updateCrypticChatWindow = function(decryptedTexts) {
 
     let newMessagesAdded = false;
 
-    // Clear existing messages that are not in the new decrypted texts
     Array.from(messagesContainer.children).forEach(child => {
         if (!decryptedTexts.includes(child.textContent)) {
             messagesContainer.removeChild(child);
@@ -374,24 +466,20 @@ CrypticChat.updateCrypticChatWindow = function(decryptedTexts) {
             messageElement.appendChild(messageSpan);
             messageElement.appendChild(timestampSpan);
 
-            // Check if it's a destructible message
             const destructMatch = text.match(/\\d ! d(\d+)\/\//);
             if (destructMatch) {
                 const destructMinutes = parseInt(destructMatch[1]);
                 const messageTime = new Date().getTime();
                 
-                // Set a timeout to remove the message
                 const timeoutId = setTimeout(() => {
                     if (messagesContainer.contains(messageElement)) {
                         messagesContainer.removeChild(messageElement);
                     }
                 }, destructMinutes * 60 * 1000);
 
-                // Store the timeout ID and destruction time
                 messageElement.dataset.timeoutId = timeoutId;
                 messageElement.dataset.destructTime = messageTime + (destructMinutes * 60 * 1000);
 
-                // Remove the destruction keyword from the displayed message
                 messageElement.textContent = text.replace(destructMatch[0], '').trim();
 
                 if (CrypticChat.showDestructTimer) {
@@ -401,7 +489,7 @@ CrypticChat.updateCrypticChatWindow = function(decryptedTexts) {
 
                     const updateTimer = () => {
                         if (!messagesContainer.contains(messageElement)) {
-                            return; // Stop updating if the element is no longer in the container
+                            return;
                         }
                         const remainingTime = Math.max(0, (messageElement.dataset.destructTime - new Date().getTime()) / 1000);
                         const minutes = Math.floor(remainingTime / 60);
@@ -417,13 +505,13 @@ CrypticChat.updateCrypticChatWindow = function(decryptedTexts) {
                 }
             }
             
-            // Apply user color if matched
-            const userColor = CrypticChat.userColors.find(uc => uc.username === username);
-            if (userColor) {
-                messageElement.style.color = userColor.color;
+            if (CrypticChat.userColors && Array.isArray(CrypticChat.userColors)) {
+                const userColor = CrypticChat.userColors.find(uc => uc.username === username);
+                if (userColor) {
+                    messageElement.style.color = userColor.color;
+                }
             }
             
-            // Placeholder for images
             if (text.includes('[IMAGE]')) {
                 const imgPlaceholder = document.createElement('div');
                 imgPlaceholder.className = 'cryptic-chat-image';
@@ -434,7 +522,7 @@ CrypticChat.updateCrypticChatWindow = function(decryptedTexts) {
                 imgPlaceholder.style.lineHeight = '200px';
                 messageElement.appendChild(imgPlaceholder);
             }
-            
+
             messagesContainer.appendChild(messageElement);
             newMessagesAdded = true;
         }
@@ -443,10 +531,14 @@ CrypticChat.updateCrypticChatWindow = function(decryptedTexts) {
     CrypticChat.applyMessageSpacing();
 
     if (newMessagesAdded && CrypticChat.autoScroll) {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        // Use requestAnimationFrame to ensure the scroll happens after the DOM update
+        requestAnimationFrame(() => {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        });
     }
 };
 
+// Icon Management
 CrypticChat.addIconsToWindow = function(crypticChatWindow) {
     const controlsContainer = crypticChatWindow.querySelector('.cryptic-chat-controls');
 
@@ -471,21 +563,9 @@ CrypticChat.addIconsToWindow = function(crypticChatWindow) {
     controlsContainer.appendChild(closeIcon);
 };
 
+// User Interactions
 CrypticChat.toggleMinimize = function(crypticChatWindow) {
     crypticChatWindow.classList.toggle('cryptic-chat-minimized');
-};
-
-CrypticChat.reloadMessages = function() {
-    chrome.storage.local.get('codebook', function(result) {
-        const codebook = result.codebook || {};
-        CrypticChat.Discord.discordParse(codebook).then(decryptedTexts => {
-            CrypticChat.updateCrypticChatWindow(decryptedTexts);
-        });
-    });
-};
-
-CrypticChat.openOptions = function() {
-    chrome.runtime.sendMessage({ action: 'openOptions' });
 };
 
 CrypticChat.setupInputHandler = function(inputArea) {
@@ -495,6 +575,16 @@ CrypticChat.setupInputHandler = function(inputArea) {
             CrypticChat.encryptAndSend(inputArea.value);
             inputArea.value = '';
         }
+    });
+};
+
+// Messaging Operations
+CrypticChat.reloadMessages = function() {
+    chrome.storage.local.get('codebook', function(result) {
+        const codebook = result.codebook || {};
+        CrypticChat.Discord.discordParse(codebook).then(decryptedTexts => {
+            CrypticChat.updateCrypticChatWindow(decryptedTexts);
+        });
     });
 };
 
@@ -518,7 +608,7 @@ CrypticChat.encryptAndSend = function(message) {
         let encryptedMessage = message;
 
         if (destructableMessages) {
-            const destructRegex = caseInsensitiveEncryption 
+            const destructRegex = caseInsensitiveEncryption
                 ? new RegExp(CrypticChat.escapeRegExp(destructKeyword), 'gi')
                 : new RegExp(CrypticChat.escapeRegExp(destructKeyword), 'g');
             const destructMatch = message.match(destructRegex);
@@ -530,7 +620,7 @@ CrypticChat.encryptAndSend = function(message) {
 
         for (const key in codebook) {
             if (codebook.hasOwnProperty(key)) {
-                const regex = caseInsensitiveEncryption 
+                const regex = caseInsensitiveEncryption
                     ? new RegExp(`\\b${CrypticChat.escapeRegExp(key)}\\b`, 'gi')
                     : new RegExp(`\\b${CrypticChat.escapeRegExp(key)}\\b`, 'g');
                 encryptedMessage = encryptedMessage.replace(regex, (match) => {
@@ -548,82 +638,18 @@ CrypticChat.encryptAndSend = function(message) {
     });
 };
 
-CrypticChat.init = function() {
-    chrome.storage.local.get([
-        'messagesToLoad',
-        'autoScroll',
-        'backgroundColor',
-        'inputBoxColor',
-        'headerColor',
-        'windowTransparency',
-        'destructableMessages',
-        'destructKeyword',
-        'crypticPhrase',
-        'defaultDestructTime',
-        'showDestructTimer',
-        'messageSpacing',
-        'messageBubbleColor',
-        'messageBubbleOpacity',
-        'userColors',
-        'codebook',
-        'messageCheckInterval',
-        'discordSelectors',
-        'caseInsensitiveEncryption',
-        'mutedUsers',
-        'autoSend'
-    ], function(items) {
-        CrypticChat.messagesToLoad = items.messagesToLoad || 50;
-        CrypticChat.autoScroll = items.autoScroll !== false;
-        CrypticChat.backgroundColor = items.backgroundColor || '#141422';
-        CrypticChat.inputBoxColor = items.inputBoxColor || '#1e1e3f';
-        CrypticChat.headerColor = items.headerColor || '#1a1a40';
-        CrypticChat.windowTransparency = items.windowTransparency || 90;
-        CrypticChat.destructableMessages = items.destructableMessages || false;
-        CrypticChat.destructKeyword = items.destructKeyword || '\\d ! d';
-        CrypticChat.crypticPhrase = items.crypticPhrase || '\\d ! d';
-        CrypticChat.defaultDestructTime = items.defaultDestructTime || 5;
-        CrypticChat.showDestructTimer = items.showDestructTimer !== false;
-        CrypticChat.messageSpacing = items.messageSpacing || 5;
-        CrypticChat.messageBubbleColor = items.messageBubbleColor || '#1e1e3f';
-        CrypticChat.messageBubbleOpacity = items.messageBubbleOpacity || 70;
-        CrypticChat.userColors = items.userColors || [];
-        CrypticChat.codebook = items.codebook || {};
-        CrypticChat.messageCheckInterval = items.messageCheckInterval || 5;
-        CrypticChat.caseInsensitiveEncryption = items.caseInsensitiveEncryption || false;
-        CrypticChat.mutedUsers = items.mutedUsers || [];
-        CrypticChat.autoSend = items.autoSend !== false;
-        CrypticChat.discordSelectors = items.discordSelectors || {
-            chatArea: '[class^="chatContent_"]',
-            messageElements: '[id^="chat-messages-"]',
-            contentElement: '[id^="message-content-"]',
-            repliedTextPreview: '[class*="repliedTextPreview_"]',
-            usernameElement: '[class*="username_"]',
-            timestampElement: 'time',
-            messageInput: 'div[role="textbox"][data-slate-editor="true"]'
-        };
-
-        CrypticChat.updateAllStyles();
-        CrypticChat.reloadMessages();
-
-        // Update the interval
-        if (CrypticChat.messageCheckIntervalId) {
-            clearInterval(CrypticChat.messageCheckIntervalId);
-        }
-        CrypticChat.messageCheckIntervalId = setInterval(CrypticChat.reloadMessages, CrypticChat.messageCheckInterval * 1000);
-    });
+// Storage and Communication
+CrypticChat.openOptions = function() {
+    chrome.runtime.sendMessage({ action: 'openOptions' });
 };
 
 chrome.storage.onChanged.addListener(function(changes, namespace) {
-    if (namespace === 'local' && changes.messageCheckInterval) {
-        CrypticChat.messageCheckInterval = changes.messageCheckInterval.newValue;
-        if (CrypticChat.messageCheckIntervalId) {
-            clearInterval(CrypticChat.messageCheckIntervalId);
-        }
-        CrypticChat.messageCheckIntervalId = setInterval(CrypticChat.reloadMessages, CrypticChat.messageCheckInterval * 1000);
+    if (namespace === 'local') {
+        CrypticChat.applyOptions();
+        CrypticChat.updateAllStyles();
     }
 });
 
-// Modify the existing listener to handle interval updates
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'reloadMessages') {
         CrypticChat.reloadMessages();
@@ -653,50 +679,5 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             };
             CrypticChat.reloadMessages();
         });
-    }
-});
-
-CrypticChat.init();
-
-const chatObserver = new MutationObserver((mutations) => {
-    for (let mutation of mutations) {
-        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-            for (let node of mutation.addedNodes) {
-                if (node.nodeType === Node.ELEMENT_NODE && node.matches(CrypticChat.discordSelectors.messageElements)) {
-                    CrypticChat.reloadMessages();
-                    return;
-                }
-            }
-        }
-    }
-});
-
-const chatArea = document.querySelector(CrypticChat.discordSelectors.chatArea);
-if (chatArea) {
-    chatObserver.observe(chatArea, { childList: true, subtree: true });
-}
-
-const channelSwitchObserver = new MutationObserver((mutations) => {
-    for (let mutation of mutations) {
-        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-            for (let node of mutation.addedNodes) {
-                if (node.nodeType === Node.ELEMENT_NODE && node.classList.contains('chat-3bRxxu')) {
-                    CrypticChat.reloadMessages();
-                    return;
-                }
-            }
-        }
-    }
-});
-
-const appMount = document.querySelector('#app-mount');
-if (appMount) {
-    channelSwitchObserver.observe(appMount, { childList: true, subtree: true });
-}
-
-chrome.storage.onChanged.addListener(function(changes, namespace) {
-    if (namespace === 'local') {
-        CrypticChat.applyOptions();
-        CrypticChat.updateAllStyles();
     }
 });
