@@ -43,10 +43,7 @@
     },
     "web_accessible_resources": [
       {
-        "resources": [
-          "icons/*.png",
-          "fonts/*.ttf"
-        ],
+        "resources": ["icons/*.png", "fonts/*.ttf"],
         "matches": ["https://discord.com/*", "https://element.io/*"]
       }
     ],
