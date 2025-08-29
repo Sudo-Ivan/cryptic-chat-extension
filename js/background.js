@@ -416,6 +416,15 @@ async function decryptData(encryptedData, key) {
   return JSON.parse(decoder.decode(decryptedContent));
 }
 
+function popoutCodebookWindow() {
+  chrome.windows.create({
+    url: chrome.runtime.getURL("html/options.html"),
+    type: "popup",
+    width: 800,
+    height: 600
+  });
+}
+
 function loadCodebook() {
   chrome.storage.local.get('codebook', function(result) {
     codebook = result.codebook || {};
