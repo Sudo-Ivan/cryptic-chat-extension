@@ -1,6 +1,32 @@
 let popupWindowId = null;
 let codebook = {};
 
+// Add shuffle functionality
+function shuffleCodebook(codebook, secretCode) {
+    // Convert secret code to a number for consistent shuffling
+    const seed = Array.from(secretCode).reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    
+    // Create a seeded random number generator
+    function seededRandom(seed) {
+        const x = Math.sin(seed++) * 10000;
+        return x - Math.floor(x);
+    }
+
+    // Get all phrases and their replacements
+    const phrases = Object.entries(codebook);
+    
+    // Shuffle the replacements using the seeded random
+    const shuffledReplacements = [...phrases].sort(() => seededRandom(seed) - 0.5);
+    
+    // Create new codebook with shuffled replacements
+    const shuffledCodebook = {};
+    phrases.forEach(([phrase, _], index) => {
+        shuffledCodebook[phrase] = shuffledReplacements[index][1];
+    });
+    
+    return shuffledCodebook;
+}
+
 function saveCodebook(newCodebook) {
   return new Promise((resolve, reject) => {
     chrome.storage.local.set({ codebook: newCodebook }, () => {
@@ -39,7 +65,24 @@ chrome.runtime.onInstalled.addListener(() => {
     })
     .catch((error) => console.error('Error during initialization:', error));
 
-  chrome.storage.local.set({ messageLimit: 10 });
+  chrome.storage.local.set({ 
+    messageLimit: 10,
+    backgroundColor: '#121212',
+    inputBoxColor: '#1e1e1e',
+    headerColor: '#1e1e1e',
+    windowTransparency: 90,
+    messageBubbleColor: '#1e1e1e',
+    messageBubbleOpacity: 70,
+    userColors: [],
+    caseInsensitiveEncryption: false,
+    destructableMessages: false,
+    destructKeyword: '\\d ! d',
+    defaultDestructTime: 5,
+    showDestructTimer: true,
+    messageSpacing: 5,
+    autoScroll: true,
+    messagesToLoad: 50
+  });
 
   chrome.contextMenus.create({
     id: "encrypt",
@@ -115,6 +158,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         codebook = updatedCodebook;
       })
       .catch((error) => console.error('Error updating codebook:', error));
+  } else if (request.action === 'shuffleCodebook') {
+    getCodebook()
+      .then((currentCodebook) => {
+        const shuffledCodebook = shuffleCodebook(currentCodebook, request.secretCode);
+        return saveCodebook(shuffledCodebook);
+      })
+      .then(() => {
+        sendResponse({ success: true });
+        chrome.runtime.sendMessage({ action: 'codebookUpdated' });
+      })
+      .catch((error) => {
+        console.error('Error shuffling codebook:', error);
+        sendResponse({ error: error.message });
+      });
+    return true;
   } else if (request.action === 'encryptData') {
     generateKey(request.password)
       .then(key => encryptData(request.data, key))

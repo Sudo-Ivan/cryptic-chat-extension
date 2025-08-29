@@ -26,6 +26,17 @@
             </div>
             <textarea id="codebookText" placeholder="Enter your codebook here..."></textarea>
             <div id="codebookPhraseCount" class="phrase-count">Phrases: 0</div>
+            
+            <div class="image-binding-section">
+                <h3>Image Bindings</h3>
+                <div class="option-row">
+                    <input type="text" id="imagePhrase" placeholder="Enter cryptic phrase for image">
+                    <input type="file" id="imageInput" accept="image/*">
+                    <button id="addImageBinding">Add Image Binding</button>
+                </div>
+                <div id="imageBindingsContainer" class="image-bindings-grid"></div>
+            </div>
+            
             <div class="drop-zone">
                 <p>Drag and drop a codebook file here</p>
             </div>
@@ -42,6 +53,15 @@
                     <input type="checkbox" id="autoUpdate">
                     <span class="slider"></span>
                 </label>
+            </div>
+
+            <div class="shuffle-codebook-section">
+                <h3>Shuffle Codebook</h3>
+                <div class="option-row">
+                    <input type="text" id="shuffleSecretCode" placeholder="Enter secret code for shuffling">
+                    <button id="shuffleCodebookBtn" class="shuffle-btn">Shuffle Codebook</button>
+                </div>
+                <p class="shuffle-info">Share the secret code with friends to shuffle codebooks in sync. The code must be shared securely.</p>
             </div>
         </section>
         

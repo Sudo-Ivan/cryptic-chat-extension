@@ -100,9 +100,10 @@ CrypticChat.Discord = {
                 let decryptedText = originalText;
                 let isDecrypted = false;
 
-                chrome.storage.local.get(['caseInsensitiveEncryption', 'crypticPhrase'], function(result) {
+                chrome.storage.local.get(['caseInsensitiveEncryption', 'crypticPhrase', 'imageBindings'], function(result) {
                     const caseInsensitiveEncryption = result.caseInsensitiveEncryption || false;
                     const crypticPhrase = result.crypticPhrase || '\\d ! d';
+                    const imageBindings = result.imageBindings || {};
 
                     // Sort the codebook keys by length in descending order
                     const sortedKeys = Object.keys(codebook).sort((a, b) => b.length - a.length);
@@ -124,6 +125,16 @@ CrypticChat.Discord = {
                             isDecrypted = true;
                         }
                     }
+
+                    // Check for image bindings in the decrypted text
+                    const words = decryptedText.split(' ');
+                    words.forEach(word => {
+                        const trimmedWord = word.trim();
+                        if (imageBindings[trimmedWord]) {
+                            console.log('Found image binding in message:', trimmedWord);
+                            isDecrypted = true;
+                        }
+                    });
 
                     if (isDecrypted) {
                         const destructRegex = new RegExp(`${CrypticChat.escapeRegExp(crypticPhrase)}(\\d+)`, caseInsensitiveEncryption ? 'gi' : 'g');

@@ -24,15 +24,17 @@ async function decryptCodebook(encryptedData, password) {
 
 async function exportCodebookOnly() {
   try {
-    chrome.storage.local.get(['codebook', 'useCodebookEncryption', 'codebookPassword'], async (items) => {
+    chrome.storage.local.get(['codebook', 'useCodebookEncryption', 'codebookPassword', 'imageBindings'], async (items) => {
       const exportData = {
-        codebook: items.codebook
+        codebook: items.codebook,
+        imageBindings: items.imageBindings || {},
+        useCodebookEncryption: items.useCodebookEncryption,
+        codebookPassword: items.codebookPassword
       };
 
-      const useCodebookEncryption = items.useCodebookEncryption;
       let dataToExport;
 
-      if (useCodebookEncryption) {
+      if (items.useCodebookEncryption) {
         const password = items.codebookPassword;
         if (!password) {
           showStatus('Please set a password for codebook encryption in the options', true);
@@ -111,7 +113,6 @@ async function handleFileUpload(file) {
                 const jsonData = JSON.parse(content);
                 
                 if (jsonData.encrypted) {
-                    // Handle encrypted data
                     const password = prompt("Please enter the password to decrypt the codebook:");
                     if (!password) {
                         showStatus('Decryption cancelled', true);
@@ -119,28 +120,29 @@ async function handleFileUpload(file) {
                     }
                     
                     try {
-                        const decryptedData = await decryptCodebook(jsonData, password);
-                        importedData = JSON.parse(decryptedData);
+                        importedData = await decryptCodebook(jsonData, password);
                     } catch (decryptError) {
                         showStatus('Error decrypting codebook: ' + decryptError.message, true);
                         return;
                     }
                 } else {
-                    // Handle unencrypted JSON data
                     importedData = jsonData;
                 }
 
-                // Update the codebook textarea
                 if (importedData.codebook) {
                     document.getElementById("codebookText").value = formatCodebook(importedData.codebook);
+                    chrome.storage.local.set({ codebook: importedData.codebook });
                 }
 
-                // Update other settings if present in the imported data
+                if (importedData.imageBindings) {
+                    chrome.storage.local.set({ imageBindings: importedData.imageBindings });
+                    updateImageBindingsDisplay();
+                }
+
                 if (importedData.settings) {
                     updateSettingsFromImport(importedData.settings);
                 }
             } else if (file.name.endsWith('.txt')) {
-                // Handle .txt files
                 importedData = { codebook: parseCodebookText(content) };
                 document.getElementById("codebookText").value = content;
             } else {
@@ -558,6 +560,21 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   document.getElementById('resetDiscordSelectors').addEventListener('click', resetDiscordSelectors);
+
+  // Add shuffle codebook button handler
+  const shuffleCodebookBtn = document.getElementById('shuffleCodebookBtn');
+  if (shuffleCodebookBtn) {
+    shuffleCodebookBtn.addEventListener('click', shuffleCodebook);
+  }
+
+  // Add these new functions for image handling
+  const addImageBindingBtn = document.getElementById('addImageBinding');
+  if (addImageBindingBtn) {
+    addImageBindingBtn.addEventListener('click', addImageBinding);
+  }
+  
+  // Initial display of image bindings
+  updateImageBindingsDisplay();
 });
 
 function handleDragOver(e) {
@@ -808,4 +825,99 @@ function autoSave() {
 
 function formatCodebook(codebook) {
   return Object.entries(codebook).map(([key, value]) => `${key} : ${value}`).join('\n');
+}
+
+// Add shuffle codebook function
+function shuffleCodebook() {
+    const secretCode = document.getElementById('shuffleSecretCode').value.trim();
+    if (!secretCode) {
+        showStatus('Please enter a secret code for shuffling', true);
+        return;
+    }
+
+    chrome.runtime.sendMessage({ 
+        action: 'shuffleCodebook',
+        secretCode: secretCode
+    }, response => {
+        if (response.error) {
+            showStatus('Error shuffling codebook: ' + response.error, true);
+        } else {
+            showStatus('Codebook shuffled successfully!');
+            loadOptions(); // Reload to show new shuffled codebook
+        }
+    });
+}
+
+// Add these new functions for image handling
+async function addImageBinding() {
+    const phrase = document.getElementById('imagePhrase').value.trim();
+    const imageInput = document.getElementById('imageInput');
+    
+    if (!phrase || !imageInput.files[0]) {
+        showStatus('Please enter a phrase and select an image', true);
+        return;
+    }
+
+    const file = imageInput.files[0];
+    const reader = new FileReader();
+    
+    reader.onload = async function(e) {
+        const base64Image = e.target.result;
+        chrome.storage.local.get(['imageBindings'], function(result) {
+            const imageBindings = result.imageBindings || {};
+            imageBindings[phrase] = base64Image;
+            
+            chrome.storage.local.set({ imageBindings }, function() {
+                showStatus('Image binding added successfully!');
+                updateImageBindingsDisplay();
+                document.getElementById('imagePhrase').value = '';
+                document.getElementById('imageInput').value = '';
+            });
+        });
+    };
+    
+    reader.readAsDataURL(file);
+}
+
+function updateImageBindingsDisplay() {
+    const container = document.getElementById('imageBindingsContainer');
+    chrome.storage.local.get(['imageBindings'], function(result) {
+        const imageBindings = result.imageBindings || {};
+        container.innerHTML = '';
+        
+        Object.entries(imageBindings).forEach(([phrase, base64Image]) => {
+            const bindingElement = document.createElement('div');
+            bindingElement.className = 'image-binding-item';
+            bindingElement.innerHTML = `
+                <div class="image-preview">
+                    <img src="${base64Image}" alt="${phrase}">
+                </div>
+                <div class="binding-info">
+                    <span class="phrase">${phrase}</span>
+                    <button class="remove-binding" data-phrase="${phrase}">Remove</button>
+                </div>
+            `;
+            container.appendChild(bindingElement);
+        });
+        
+        // Add event listeners for remove buttons
+        container.querySelectorAll('.remove-binding').forEach(button => {
+            button.addEventListener('click', function() {
+                const phrase = this.dataset.phrase;
+                removeImageBinding(phrase);
+            });
+        });
+    });
+}
+
+function removeImageBinding(phrase) {
+    chrome.storage.local.get(['imageBindings'], function(result) {
+        const imageBindings = result.imageBindings || {};
+        delete imageBindings[phrase];
+        
+        chrome.storage.local.set({ imageBindings }, function() {
+            showStatus('Image binding removed successfully!');
+            updateImageBindingsDisplay();
+        });
+    });
 }
