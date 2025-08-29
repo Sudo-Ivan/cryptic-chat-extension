@@ -474,131 +474,169 @@ CrypticChat.updateCrypticChatWindow = function(decryptedTexts) {
     
     if (!messagesContainer) return;
     
+    // Store scroll position before any changes
+    const scrollTop = messagesContainer.scrollTop;
+    const scrollHeight = messagesContainer.scrollHeight;
+    const clientHeight = messagesContainer.clientHeight;
+    const isAtBottom = (scrollHeight - clientHeight - scrollTop) < 5;
+    
+    // If no messages, clear and return
     if (decryptedTexts.length === 0) {
-        messagesContainer.innerHTML = '';
+        if (messagesContainer.children.length > 0) {
+            messagesContainer.innerHTML = '';
+        }
         return;
     }
     
-    const existingMessages = new Set(
-        Array.from(messagesContainer.children).map(child => child.textContent)
-    );
-
-    let newMessagesAdded = false;
-
-    // Remove messages that no longer exist
-    Array.from(messagesContainer.children).forEach(child => {
-        if (!decryptedTexts.includes(child.textContent)) {
-            messagesContainer.removeChild(child);
-        }
-    });
-
-    // Add new messages
-    decryptedTexts.forEach(text => {
-        if (!existingMessages.has(text)) {
-            existingMessages.add(text);
-            const messageElement = document.createElement('div');
-            messageElement.className = 'cryptic-chat-message';
-            
-            const [username, ...messageParts] = text.split(':');
-            const message = messageParts.join(':').trim();
-            const timestamp = message.match(/- (\d{2}:\d{2})/);
-
-            const usernameSpan = document.createElement('span');
-            usernameSpan.className = 'cryptic-chat-username';
-            usernameSpan.textContent = username;
-
-            const messageContent = document.createElement('div');
-            messageContent.className = 'cryptic-chat-text';
-
-            const timestampSpan = document.createElement('span');
-            timestampSpan.className = 'cryptic-chat-timestamp';
-            timestampSpan.textContent = timestamp ? timestamp[1] : '';
-
-            messageElement.appendChild(usernameSpan);
-            messageElement.appendChild(messageContent);
-            messageElement.appendChild(timestampSpan);
-
-            // Check for image bindings
-            chrome.storage.local.get(['imageBindings'], function(result) {
-                const imageBindings = result.imageBindings || {};
-                const words = message.replace(/- \d{2}:\d{2}$/, '').trim().split(' ');
-                
-                words.forEach(word => {
-                    const trimmedWord = word.trim();
-                    
-                    if (imageBindings[trimmedWord]) {
-                        const img = document.createElement('img');
-                        img.src = imageBindings[trimmedWord];
-                        img.className = 'cryptic-chat-image';
-                        img.alt = trimmedWord;
-                        
-                        img.onload = () => {
-                            messageContent.appendChild(img);
-                        };
-                        
-                        img.onerror = (error) => {
-                            messageContent.appendChild(document.createTextNode(trimmedWord + ' '));
-                        };
-                    } else {
-                        messageContent.appendChild(document.createTextNode(word + ' '));
-                    }
-                });
-            });
-
-            const destructMatch = text.match(/\\d ! d(\d+)\/\//);
-            if (destructMatch) {
-                const destructMinutes = parseInt(destructMatch[1]);
-                const messageTime = new Date().getTime();
-                
-                const timeoutId = setTimeout(() => {
-                    if (messagesContainer.contains(messageElement)) {
-                        messagesContainer.removeChild(messageElement);
-                    }
-                }, destructMinutes * 60 * 1000);
-
-                messageElement.dataset.timeoutId = timeoutId;
-                messageElement.dataset.destructTime = messageTime + (destructMinutes * 60 * 1000);
-
-                messageElement.textContent = text.replace(destructMatch[0], '').trim();
-
-                if (CrypticChat.showDestructTimer) {
-                    const timerElement = document.createElement('span');
-                    timerElement.className = 'destruct-timer';
-                    messageElement.appendChild(timerElement);
-
-                    const updateTimer = () => {
-                        if (!messagesContainer.contains(messageElement)) {
-                            return;
-                        }
-                        const remainingTime = Math.max(0, (messageElement.dataset.destructTime - new Date().getTime()) / 1000);
-                        const minutes = Math.floor(remainingTime / 60);
-                        const seconds = Math.floor(remainingTime % 60);
-                        timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-
-                        if (remainingTime > 0) {
-                            requestAnimationFrame(updateTimer);
-                        }
-                    };
-
-                    updateTimer();
-                }
-            }
-            
-            if (CrypticChat.userColors && Array.isArray(CrypticChat.userColors)) {
-                const userColor = CrypticChat.userColors.find(uc => uc.username === username);
-                if (userColor) {
-                    messageElement.style.color = userColor.color;
-                }
-            }
-
-            messagesContainer.appendChild(messageElement);
-            newMessagesAdded = true;
-        }
-    });
-
-    CrypticChat.applyMessageSpacing();
+    // Create a document fragment to minimize reflows
+    const fragment = document.createDocumentFragment();
+    const existingMessageMap = new Map();
     
-    // Scroll positioning is now handled in the reloadMessages function
+    // Map existing messages by their unique identifier
+    Array.from(messagesContainer.children).forEach(child => {
+        const messageText = child.dataset.messageText || child.textContent;
+        existingMessageMap.set(messageText, child);
+    });
+    
+    // Build new message list efficiently
+    const newMessages = [];
+    decryptedTexts.forEach(text => {
+        if (existingMessageMap.has(text)) {
+            // Message already exists, reuse it
+            newMessages.push(existingMessageMap.get(text));
+            existingMessageMap.delete(text);
+        } else {
+            // Create new message element
+            const messageElement = CrypticChat.createMessageElement(text);
+            newMessages.push(messageElement);
+        }
+    });
+    
+    // Clear container and add all messages at once
+    messagesContainer.innerHTML = '';
+    newMessages.forEach(msg => fragment.appendChild(msg));
+    messagesContainer.appendChild(fragment);
+    
+    // Restore scroll position immediately
+    if (CrypticChat.autoScroll && isAtBottom) {
+        // If auto-scroll is on and user was at bottom, scroll to bottom
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    } else {
+        // Otherwise maintain the exact scroll position
+        messagesContainer.scrollTop = scrollTop;
+    }
+    
+    CrypticChat.applyMessageSpacing();
+};
+
+CrypticChat.createMessageElement = function(text) {
+    const messageElement = document.createElement('div');
+    messageElement.className = 'cryptic-chat-message';
+    messageElement.dataset.messageText = text;
+    
+    const [username, ...messageParts] = text.split(':');
+    const message = messageParts.join(':').trim();
+    const timestamp = message.match(/- (\d{2}:\d{2})/);
+
+    const usernameSpan = document.createElement('span');
+    usernameSpan.className = 'cryptic-chat-username';
+    usernameSpan.textContent = username;
+
+    const messageContent = document.createElement('div');
+    messageContent.className = 'cryptic-chat-text';
+
+    const timestampSpan = document.createElement('span');
+    timestampSpan.className = 'cryptic-chat-timestamp';
+    timestampSpan.textContent = timestamp ? timestamp[1] : '';
+
+    messageElement.appendChild(usernameSpan);
+    messageElement.appendChild(messageContent);
+    messageElement.appendChild(timestampSpan);
+
+    // Handle image bindings asynchronously to avoid blocking
+    CrypticChat.processMessageImages(messageContent, message);
+
+    // Handle destructible messages
+    const destructMatch = text.match(/\\d ! d(\d+)\/\//);
+    if (destructMatch) {
+        CrypticChat.setupDestructibleMessage(messageElement, destructMatch, text);
+    }
+    
+    // Apply user colors
+    if (CrypticChat.userColors && Array.isArray(CrypticChat.userColors)) {
+        const userColor = CrypticChat.userColors.find(uc => uc.username === username);
+        if (userColor) {
+            messageElement.style.color = userColor.color;
+        }
+    }
+
+    return messageElement;
+};
+
+CrypticChat.processMessageImages = function(messageContent, message) {
+    chrome.storage.local.get(['imageBindings'], function(result) {
+        const imageBindings = result.imageBindings || {};
+        const words = message.replace(/- \d{2}:\d{2}$/, '').trim().split(' ');
+        
+        words.forEach(word => {
+            const trimmedWord = word.trim();
+            
+            if (imageBindings[trimmedWord]) {
+                const img = document.createElement('img');
+                img.src = imageBindings[trimmedWord];
+                img.className = 'cryptic-chat-image';
+                img.alt = trimmedWord;
+                
+                img.onload = () => {
+                    messageContent.appendChild(img);
+                };
+                
+                img.onerror = () => {
+                    messageContent.appendChild(document.createTextNode(trimmedWord + ' '));
+                };
+            } else {
+                messageContent.appendChild(document.createTextNode(word + ' '));
+            }
+        });
+    });
+};
+
+CrypticChat.setupDestructibleMessage = function(messageElement, destructMatch, text) {
+    const destructMinutes = parseInt(destructMatch[1]);
+    const messageTime = new Date().getTime();
+    
+    const timeoutId = setTimeout(() => {
+        if (messageElement.parentNode) {
+            messageElement.parentNode.removeChild(messageElement);
+        }
+    }, destructMinutes * 60 * 1000);
+
+    messageElement.dataset.timeoutId = timeoutId;
+    messageElement.dataset.destructTime = messageTime + (destructMinutes * 60 * 1000);
+
+    messageElement.textContent = text.replace(destructMatch[0], '').trim();
+
+    if (CrypticChat.showDestructTimer) {
+        const timerElement = document.createElement('span');
+        timerElement.className = 'destruct-timer';
+        messageElement.appendChild(timerElement);
+
+        const updateTimer = () => {
+            if (!messageElement.parentNode) {
+                return;
+            }
+            const remainingTime = Math.max(0, (messageElement.dataset.destructTime - new Date().getTime()) / 1000);
+            const minutes = Math.floor(remainingTime / 60);
+            const seconds = Math.floor(remainingTime % 60);
+            timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+            if (remainingTime > 0) {
+                requestAnimationFrame(updateTimer);
+            }
+        };
+
+        updateTimer();
+    }
 };
 
 // Icon Management
@@ -710,47 +748,11 @@ CrypticChat.reloadMessages = function() {
     const messagesContainer = document.querySelector('.cryptic-chat-content');
     if (!messagesContainer) return;
     
-    // Store scroll position BEFORE any operations
-    const scrollTop = messagesContainer.scrollTop;
-    const scrollHeight = messagesContainer.scrollHeight;
-    const clientHeight = messagesContainer.clientHeight;
-    const isAtBottom = (scrollHeight - clientHeight - scrollTop) < 5;
-    
-    // Store these values for use in the callback
-    CrypticChat.currentScrollData = {
-        scrollTop: scrollTop,
-        isAtBottom: isAtBottom,
-        previousHeight: scrollHeight
-    };
-    
-    // Track if this is a first load (no messages yet)
-    const isFirstLoad = messagesContainer.children.length === 0;
-    
     chrome.storage.local.get('codebook', function(result) {
         const codebook = result.codebook || {};
         CrypticChat.Discord.discordParse(codebook).then(decryptedTexts => {
-            // Update UI with message content
+            // Update UI with message content - scroll handling is done inside this function
             CrypticChat.updateCrypticChatWindow(decryptedTexts);
-            
-            // Restore scroll position AFTER update
-            requestAnimationFrame(() => {
-                const messagesContainer = document.querySelector('.cryptic-chat-content');
-                if (!messagesContainer) return;
-                
-                if (CrypticChat.currentScrollData) {
-                    if ((CrypticChat.currentScrollData.isAtBottom && CrypticChat.autoScroll) || isFirstLoad) {
-                        // If we were at bottom and auto-scroll enabled or this is the first load, scroll to bottom
-                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                    } else if (messagesContainer.scrollHeight !== CrypticChat.currentScrollData.previousHeight) {
-                        // If height changed but we weren't at bottom, maintain relative position
-                        const heightDifference = messagesContainer.scrollHeight - CrypticChat.currentScrollData.previousHeight;
-                        messagesContainer.scrollTop = CrypticChat.currentScrollData.scrollTop + heightDifference;
-                    } else {
-                        // If height didn't change, restore exact position
-                        messagesContainer.scrollTop = CrypticChat.currentScrollData.scrollTop;
-                    }
-                }
-            });
         });
     });
 };
@@ -858,23 +860,18 @@ CrypticChat.setupScrollTracking = function() {
     if (!messagesContainer || messagesContainer.hasScrollListener) return;
     
     messagesContainer.hasScrollListener = true;
+    
+    // Update scroll button visibility on scroll
     messagesContainer.addEventListener('scroll', function() {
-        if (!CrypticChat.scrollTimeout) {
-            CrypticChat.scrollTimeout = setTimeout(function() {
-                CrypticChat.scrollTimeout = null;
-                
-                // Update scroll state
-                const scrollTop = messagesContainer.scrollTop;
-                const scrollHeight = messagesContainer.scrollHeight;
-                const clientHeight = messagesContainer.clientHeight;
-                const isAtBottom = (scrollHeight - clientHeight - scrollTop) < 5;
-                
-                CrypticChat.currentScrollData = {
-                    scrollTop: scrollTop,
-                    isAtBottom: isAtBottom,
-                    previousHeight: scrollHeight
-                };
-            }, 100);
+        const scrollTop = messagesContainer.scrollTop;
+        const scrollHeight = messagesContainer.scrollHeight;
+        const clientHeight = messagesContainer.clientHeight;
+        const isAtBottom = (scrollHeight - clientHeight - scrollTop) < 5;
+        
+        // Update scroll button visibility
+        const scrollButton = document.querySelector('.cryptic-chat-scroll-btn');
+        if (scrollButton) {
+            scrollButton.style.display = isAtBottom ? 'none' : 'block';
         }
     });
 };
