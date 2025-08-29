@@ -12,15 +12,18 @@ function processText(action, inputElement, outputElement) {
     return;
   }
 
-  chrome.runtime.sendMessage({ action: action, message: inputText }, (response) => {
+  chrome.runtime.sendMessage({ action: action, message: inputText, platform: 'popup' }, (response) => {
     if (chrome.runtime.lastError) {
       console.error("Runtime error:", chrome.runtime.lastError.message);
       outputElement.value = "Error: Could not process " + action + ".";
+    } else if (response?.error) {
+      console.error("Background script error:", response.error);
+      outputElement.value = "Error: " + response.error;
     } else if (response?.[action + 'edMessage']) {
       outputElement.value = response[action + 'edMessage'];
     } else {
-      console.error("Unexpected response:", response);
-      outputElement.value = "";
+      console.error("Unexpected response format:", response);
+      outputElement.value = "Error: Unexpected response format";
     }
     isProcessing = false;
   });

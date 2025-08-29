@@ -214,7 +214,7 @@ function isValidMessage(request) {
   return request &&
          (request.action === 'encrypt' || request.action === 'decrypt') &&
          typeof request.message === 'string' &&
-         (request.platform === 'discord' || request.platform === 'element' || request.platform === 'contextMenu');
+         (request.platform === 'discord' || request.platform === 'element' || request.platform === 'contextMenu' || request.platform === 'popup');
 }
 
 function processMessage(request, sendResponse) {
