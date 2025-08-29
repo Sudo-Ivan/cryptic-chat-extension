@@ -308,6 +308,13 @@ CrypticChat.init = function() {
         CrypticChat.messageCheckIntervalId = setInterval(CrypticChat.reloadMessages, CrypticChat.messageCheckInterval * 1000);
 
         CrypticChat.setupObservers();
+        
+        // Auto-create the chat window if on Discord/Element
+        if (window.location.hostname === 'discord.com' || window.location.hostname === 'element.io') {
+            setTimeout(() => {
+                CrypticChat.createCrypticChatWindow();
+            }, 1000);
+        }
     });
 };
 
@@ -349,9 +356,15 @@ CrypticChat.setupObservers = function() {
     }
 };
 
-document.addEventListener('DOMContentLoaded', function() {
+// Initialize immediately if DOM is already loaded, otherwise wait for DOMContentLoaded
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+        CrypticChat.init();
+    });
+} else {
+    // DOM is already loaded, initialize immediately
     CrypticChat.init();
-});
+}
 
 CrypticChat.applyMessageSpacing = function() {
     const messagesContainer = document.querySelector('.cryptic-chat-content');

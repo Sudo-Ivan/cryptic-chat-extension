@@ -148,7 +148,13 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'reloadMessages') {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      chrome.tabs.sendMessage(tabs[0].id, { action: 'reloadMessages' });
+      if (tabs[0]) {
+        chrome.tabs.sendMessage(tabs[0].id, { action: 'reloadMessages' }, (response) => {
+          if (chrome.runtime.lastError) {
+            console.log('Content script not ready:', chrome.runtime.lastError.message);
+          }
+        });
+      }
     });
   } else if (request.action === 'openOptions') {
     chrome.runtime.openOptionsPage();
@@ -187,7 +193,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   } else if (request.action === 'updateDiscordSelectors' || request.action === 'updateElementSelectors') {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      chrome.tabs.sendMessage(tabs[0].id, { action: request.action });
+      if (tabs[0]) {
+        chrome.tabs.sendMessage(tabs[0].id, { action: request.action }, (response) => {
+          if (chrome.runtime.lastError) {
+            console.log('Content script not ready:', chrome.runtime.lastError.message);
+          }
+        });
+      }
     });
   } else if (request.action === 'popoutCodebook') {
     popoutCodebookWindow();
@@ -199,7 +211,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.action === 'updateStyles') {
     chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
       if (tabs[0]) {
-        chrome.tabs.sendMessage(tabs[0].id, {action: "updateAllStyles"});
+        chrome.tabs.sendMessage(tabs[0].id, {action: "updateAllStyles"}, (response) => {
+          if (chrome.runtime.lastError) {
+            console.log('Content script not ready:', chrome.runtime.lastError.message);
+          }
+        });
       }
     });
   } else if (isValidMessage(request)) {
@@ -377,7 +393,11 @@ function startMessageCheckInterval(interval) {
 function checkForNewMessages() {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs[0]) {
-      chrome.tabs.sendMessage(tabs[0].id, { action: 'checkForNewMessages' });
+      chrome.tabs.sendMessage(tabs[0].id, { action: 'checkForNewMessages' }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.log('Content script not ready:', chrome.runtime.lastError.message);
+        }
+      });
     }
   });
 }
